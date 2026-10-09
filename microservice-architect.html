@@ -435,7 +435,17 @@ document.getElementById("btn-reset-view").addEventListener("click", ()=>{
 /* ============================================================
    HELPERS
    ============================================================ */
-function uid(prefix){ idCounter++; return prefix + idCounter; }
+/* Überspringt IDs, die bereits vergeben sind — importierte Diagramme können IDs
+   enthalten, die der Zähler dieser Sitzung noch nicht kennt. */
+function idInUse(id){
+  return state.connections.some(c=>c.id===id) ||
+    state.nodes.some(n=>n.id===id || (n.events||[]).some(e=>e.id===id));
+}
+function uid(prefix){
+  let id;
+  do { idCounter++; id = prefix + idCounter; } while (idInUse(id));
+  return id;
+}
 function getNode(id){ return state.nodes.find(n=>n.id===id); }
 function nodeSize(node){ return {w:NODE_W[node.type], h:NODE_H[node.type]}; }
 
