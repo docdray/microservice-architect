@@ -44,7 +44,14 @@ Besonderheiten:
 
 - Gibt es nur eine eingehende REST- oder DB-Verbindung, läuft die Animation als Antwort entgegen der Pfeilrichtung.
 - Datenbank-Events haben kein wählbares Ziel – sie antworten immer an das Element, dessen Event sie ausgelöst hat, und können daher nicht manuell gestartet werden.
-- Ketten laufen so lange weiter, bis nichts mehr getriggert wird. **Achtung:** Zyklische Trigger (A → B → A) laufen endlos und müssen über **⏹ Simulation stoppen** beendet werden.
+- Ketten laufen so lange weiter, bis nichts mehr getriggert wird. Zyklische Trigger (A → B → A) laufen endlos und müssen über **⏹ Simulation stoppen** beendet werden.
+
+### Zyklus-Erkennung
+
+Zyklen in den Event-Ketten werden unabhängig von der Simulation laufend erkannt – nach denselben Regeln, nach denen die Simulation Events weiterleitet (inklusive Antworten von Datenbanken an ihren Absender). Über jedem betroffenen Element erscheint ein roter Kreis mit Ausrufezeichen. Beim Überfahren mit der Maus:
+
+- erscheint die Meldung **„Zyklus erkannt“** mit dem Ablauf als Liste `Element: Event → Empfänger`, beginnend beim Event des überfahrenen Elements (maximal 10 Einträge),
+- leuchten die Warnkreise aller Elemente desselben Zyklus auf.
 
 ### Ansicht & Bedienung
 

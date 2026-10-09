@@ -184,18 +184,31 @@
   .node-glow .node-label{fill:var(--accent-sim);}
   .conn-glow .conn-path{stroke:var(--accent-sim);filter:drop-shadow(0 0 6px var(--accent-sim));}
 
-  #tooltip{
+  /* Zyklus-Warnung über betroffenen Elementen */
+  .cycle-marker{cursor:help;}
+  .cycle-marker circle{fill:#2a1216;stroke:var(--danger);stroke-width:1.8;transition:filter .1s;}
+  .cycle-marker text{font-size:12px;font-weight:800;fill:var(--danger);pointer-events:none;user-select:none;}
+  .cycle-marker.cycle-glow circle{fill:#4a1c22;filter:drop-shadow(0 0 5px var(--danger)) drop-shadow(0 0 12px var(--danger));}
+
+  #tooltip, #cycle-tooltip{
     position:absolute;z-index:30;pointer-events:none;
     background:#101820;border:1px solid #24313f;color:var(--text);
     padding:8px 12px;border-radius:9px;font-size:12.5px;line-height:1.45;
     max-width:240px;box-shadow:0 8px 22px rgba(0,0,0,.55);
     transform:translate(-50%,calc(-100% - 14px));opacity:0;transition:opacity .1s;
   }
-  #tooltip.show{opacity:1;}
-  #tooltip::after{
+  #tooltip.show, #cycle-tooltip.show{opacity:1;}
+  #tooltip::after, #cycle-tooltip::after{
     content:"";position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);
     border-width:7px 7px 0 7px;border-style:solid;border-color:#101820 transparent transparent transparent;
   }
+
+  #cycle-tooltip{max-width:340px;border-color:#4a1c22;}
+  #cycle-tooltip h5{margin:0 0 6px;font-size:12.5px;color:var(--danger);}
+  #cycle-tooltip h5:not(:first-child){margin-top:10px;}
+  #cycle-tooltip ol{margin:0;padding-left:26px;}
+  #cycle-tooltip .ev-name{color:var(--accent-sim);font-weight:600;}
+  #cycle-tooltip .more{margin-top:4px;color:var(--text-dim);font-size:11.5px;}
 
   #confirmOverlay, #errorOverlay{
     position:absolute;inset:0;background:rgba(3,5,8,.6);z-index:40;
@@ -285,6 +298,7 @@
 
   <div id="hint-toast"></div>
   <div id="tooltip"></div>
+  <div id="cycle-tooltip"></div>
 
   <div id="confirmOverlay">
     <div id="confirmBox">
@@ -591,6 +605,7 @@ function getConnOffset(conn){
    RENDER
    ============================================================ */
 function render(){
+  currentCycles = detectCycles();
   renderConnections();
   renderNodes();
 }
@@ -602,6 +617,7 @@ function svgEl(tag, attrs){
 }
 
 function renderNodes(){
+  hideCycleTooltip(); // Marker werden neu aufgebaut — ein offener Tooltip hätte sonst kein mouseleave mehr
   nodeLayer.innerHTML = "";
   for (const node of state.nodes){
     nodeLayer.appendChild(buildNodeEl(node));
@@ -663,6 +679,10 @@ function buildNodeEl(node){
   }
   if (node.type === "service"){
     g.appendChild(buildHandle(node, w, h, "event", 1, "var(--accent-event)", "E"));
+  }
+
+  if (currentCycles.some(c=>c.nodeIds.has(node.id))){
+    g.appendChild(buildCycleMarker(node, h));
   }
 
   // interactions
@@ -1086,6 +1106,165 @@ function findConnectionForTravel(fromId, toId){
   return null;
 }
 
+/* ---------------- Zyklus-Erkennung (unabhängig von der Simulation) ----------------
+   Bildet den Ablauf der Simulation statisch als Graph nach: ein Zustand ist
+   "Event E feuert an Element N". Er führt zu jedem Event E' eines Ziels T, dessen
+   Trigger dem Namen von E entspricht — sofern es wie in fireEvent einen Weg zu T gibt.
+   Datenbank-Events antworten an ihren Absender, daher gehört dieser bei ihnen zum Zustand. */
+let currentCycles = [];
+
+function buildEventGraph(){
+  const states = new Map();
+  const edges = new Map();
+  const queue = [];
+  function addState(node, ev, senderId){
+    const key = node.id + "|" + ev.id + (node.type === "database" ? "|" + (senderId || "") : "");
+    if (!states.has(key)){
+      states.set(key, {key, node, ev, senderId});
+      queue.push(key);
+    }
+    return key;
+  }
+  state.nodes.forEach(n=>{
+    if (n.type !== "database") (n.events||[]).forEach(ev=>addState(n, ev, null));
+  });
+  while (queue.length){
+    const key = queue.shift();
+    const {node, ev, senderId} = states.get(key);
+    const targetIds = node.type === "database" ? (senderId ? [senderId] : []) : (ev.targetIds || []);
+    const label = ev.name || "(Event)";
+    const out = [];
+    targetIds.forEach(targetId=>{
+      const target = getNode(targetId);
+      if (!target || !findConnectionForTravel(node.id, targetId)) return;
+      (target.events||[]).forEach(next=>{
+        if (next.trigger === label) out.push(addState(target, next, node.id));
+      });
+    });
+    edges.set(key, out);
+  }
+  return {states, edges};
+}
+
+/* Stark zusammenhängende Komponenten (Tarjan); jede mit mehr als einem Zustand
+   oder einer Selbstschleife ist ein Zyklus. */
+function detectCycles(){
+  const {states, edges} = buildEventGraph();
+  const index = new Map(), low = new Map(), onStack = new Set(), stack = [];
+  const cycles = [];
+  let counter = 0;
+  function strongConnect(v){
+    index.set(v, counter); low.set(v, counter); counter++;
+    stack.push(v); onStack.add(v);
+    for (const w of edges.get(v)){
+      if (!index.has(w)){ strongConnect(w); low.set(v, Math.min(low.get(v), low.get(w))); }
+      else if (onStack.has(w)) low.set(v, Math.min(low.get(v), index.get(w)));
+    }
+    if (low.get(v) === index.get(v)){
+      const comp = new Set();
+      let w;
+      do { w = stack.pop(); onStack.delete(w); comp.add(w); } while (w !== v);
+      if (comp.size > 1 || edges.get(v).includes(v)){
+        const nodeIds = new Set([...comp].map(k=>states.get(k).node.id));
+        cycles.push({keys:comp, nodeIds, states, edges});
+      }
+    }
+  }
+  for (const key of states.keys()){
+    if (!index.has(key)) strongConnect(key);
+  }
+  return cycles;
+}
+
+/* Kürzester Umlauf innerhalb eines Zyklus, der beim ersten Event des Elements beginnt.
+   Liefert die Schritte als [{from, to}] mit Zuständen. */
+function cyclePathFrom(cycle, nodeId){
+  const start = [...cycle.keys].find(k=>cycle.states.get(k).node.id === nodeId);
+  const prev = new Map();
+  const queue = [start];
+  const seen = new Set([start]);
+  while (queue.length){
+    const u = queue.shift();
+    for (const v of cycle.edges.get(u)){
+      if (!cycle.keys.has(v)) continue;
+      if (v === start){
+        const path = [{from:cycle.states.get(u), to:cycle.states.get(v)}];
+        let cur = u;
+        while (cur !== start){
+          const p = prev.get(cur);
+          path.unshift({from:cycle.states.get(p), to:cycle.states.get(cur)});
+          cur = p;
+        }
+        return path;
+      }
+      if (!seen.has(v)){ seen.add(v); prev.set(v, u); queue.push(v); }
+    }
+  }
+  return [];
+}
+
+const cycleTooltipEl = document.getElementById("cycle-tooltip");
+const CYCLE_MAX_STEPS = 10;
+
+function showCycleTooltip(node, markerEl){
+  hideTooltip();
+  const cycles = currentCycles.filter(c=>c.nodeIds.has(node.id));
+  cycleTooltipEl.innerHTML = "";
+  cycles.forEach(cycle=>{
+    const h = document.createElement("h5");
+    h.textContent = "⚠ Zyklus erkannt";
+    cycleTooltipEl.appendChild(h);
+    const path = cyclePathFrom(cycle, node.id);
+    const ol = document.createElement("ol");
+    path.slice(0, CYCLE_MAX_STEPS).forEach(step=>{
+      const li = document.createElement("li");
+      const evName = document.createElement("span");
+      evName.className = "ev-name";
+      evName.textContent = step.from.ev.name || "(Event)";
+      li.append(step.from.node.name + ": ", evName, " → " + step.to.node.name);
+      ol.appendChild(li);
+    });
+    cycleTooltipEl.appendChild(ol);
+    if (path.length > CYCLE_MAX_STEPS){
+      const more = document.createElement("div");
+      more.className = "more";
+      more.textContent = "… und " + (path.length - CYCLE_MAX_STEPS) + " weitere Events";
+      cycleTooltipEl.appendChild(more);
+    }
+  });
+  const r = markerEl.getBoundingClientRect();
+  cycleTooltipEl.style.left = (r.left + r.width/2) + "px";
+  cycleTooltipEl.style.top = r.top + "px";
+  cycleTooltipEl.classList.add("show");
+  setCycleMarkerGlow(cycles, true);
+}
+
+function hideCycleTooltip(){
+  cycleTooltipEl.classList.remove("show");
+  nodeLayer.querySelectorAll(".cycle-marker.cycle-glow").forEach(el=>el.classList.remove("cycle-glow"));
+}
+
+function setCycleMarkerGlow(cycles, on){
+  cycles.forEach(c=>c.nodeIds.forEach(id=>{
+    const el = nodeLayer.querySelector(`.cycle-marker[data-node="${id}"]`);
+    if (el) el.classList.toggle("cycle-glow", on);
+  }));
+}
+
+function buildCycleMarker(node, h){
+  const grp = svgEl("g", {class:"cycle-marker", "data-node":node.id, transform:`translate(0,${-h/2 - 16})`});
+  grp.appendChild(svgEl("circle", {r:9}));
+  const txt = svgEl("text", {"text-anchor":"middle", y:4.5});
+  txt.textContent = "!";
+  grp.appendChild(txt);
+  grp.addEventListener("mouseenter", ()=>{
+    if (dragCtx || connCtx || panning) return;
+    showCycleTooltip(node, grp);
+  });
+  grp.addEventListener("mouseleave", hideCycleTooltip);
+  return grp;
+}
+
 /* Vorschlagsliste für Trigger-Namen: alle Event-Namen, die irgendwo im Diagramm definiert sind. */
 function collectTriggerSuggestions(){
   const names = new Set();
@@ -1209,6 +1388,7 @@ function renderEventsSection(node, content){
     const defaultTrigger = node.type === "database" ? "" : "__button__";
     node.events.push({id:uid("ev"), name:"Neues Event", trigger:defaultTrigger, targetIds:[]});
     refresh();
+    render();
   });
   content.appendChild(addBtn);
 
@@ -1229,7 +1409,7 @@ function buildEventRow(node, ev, onChange){
   const nameInput = document.createElement("input");
   nameInput.type = "text"; nameInput.className = "event-name-input";
   nameInput.value = ev.name; nameInput.placeholder = "Event-Name";
-  nameInput.addEventListener("input", ()=>{ ev.name = nameInput.value; });
+  nameInput.addEventListener("input", ()=>{ ev.name = nameInput.value; render(); });
   card.appendChild(nameInput);
 
   if (node.type === "frontend"){
@@ -1295,6 +1475,7 @@ function buildEventRow(node, ev, onChange){
       } else {
         newWrap.style.display = "none";
         ev.trigger = sel.value;
+        render();
       }
     });
     function commitNewTrigger(){
@@ -1303,6 +1484,7 @@ function buildEventRow(node, ev, onChange){
         ev.trigger = v;
         newWrap.style.display = "none";
         populateSelect();
+        render();
       } else {
         newWrap.style.display = "none";
         sel.value = ev.trigger && ev.trigger !== "__button__" ? ev.trigger : (isDb ? "" : "__button__");
@@ -1353,6 +1535,7 @@ function buildEventRow(node, ev, onChange){
   delBtn.addEventListener("click", ()=>{
     node.events = (node.events||[]).filter(e=>e.id!==ev.id);
     onChange();
+    render();
   });
   btnRow.appendChild(delBtn);
   card.appendChild(btnRow);
@@ -1418,21 +1601,20 @@ function buildTargetDropdown(node, ev, options){
         ev.targetIds = ev.targetIds.filter(id=>id!==t.id);
       }
       updateButtonLabel();
+      render();
+      glow(true); // render() baut das Diagramm neu auf — Hover-Glühen wiederherstellen
     });
     row.appendChild(cb);
     const span = document.createElement("span");
     span.textContent = t.name + (opt.response ? " (Antwort ← REST)" : "");
     row.appendChild(span);
-    row.addEventListener("mouseenter", ()=>{
-      setNodeGlow(t.id, true);
+    function glow(on){
+      setNodeGlow(t.id, on);
       const hop = findConnectionForTravel(node.id, t.id);
-      if (hop) setConnGlow(hop.conn.id, true);
-    });
-    row.addEventListener("mouseleave", ()=>{
-      setNodeGlow(t.id, false);
-      const hop = findConnectionForTravel(node.id, t.id);
-      if (hop) setConnGlow(hop.conn.id, false);
-    });
+      if (hop) setConnGlow(hop.conn.id, on);
+    }
+    row.addEventListener("mouseenter", ()=>glow(true));
+    row.addEventListener("mouseleave", ()=>glow(false));
     panel.appendChild(row);
   });
 
