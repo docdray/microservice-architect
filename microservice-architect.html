@@ -228,6 +228,9 @@
   #confirmBox button#confirmYes{background:#2a1216;border-color:#4a1c22;color:var(--danger);}
   #confirmBox button:hover, #errorBox button:hover{filter:brightness(1.2);}
   #errorBox{max-width:440px;}
+  #confirmDetails{max-height:260px;overflow:auto;margin:-6px 0 0;}
+  #confirmDetails ul{margin:0 0 16px;padding-left:18px;font-size:12.5px;line-height:1.5;color:var(--text);}
+  #confirmDetails p{margin:0 0 6px;}
   #errorBox h4{margin:0 0 10px;font-size:14px;color:var(--danger);}
   #errorList{margin:0 0 16px;padding-left:18px;font-size:12.5px;line-height:1.5;color:var(--text);max-height:260px;overflow:auto;}
   #hint-toast{
@@ -303,6 +306,7 @@
   <div id="confirmOverlay">
     <div id="confirmBox">
       <p id="confirmMsg"></p>
+      <div id="confirmDetails"></div>
       <div class="btnrow">
         <button id="confirmNo">Abbrechen</button>
         <button id="confirmYes">Löschen</button>
@@ -507,8 +511,28 @@ const confirmOverlay = document.getElementById("confirmOverlay");
 const confirmMsg = document.getElementById("confirmMsg");
 const confirmYes = document.getElementById("confirmYes");
 const confirmNo = document.getElementById("confirmNo");
-function showConfirm(message, onConfirm){
+const confirmDetails = document.getElementById("confirmDetails");
+/* opts.yesLabel: Text des Bestätigungs-Buttons (Standard „Löschen“),
+   opts.sections: optionale Abschnitte [{text, items:[…]}] unter der Meldung */
+function showConfirm(message, onConfirm, opts){
+  opts = opts || {};
   confirmMsg.textContent = message;
+  confirmYes.textContent = opts.yesLabel || "Löschen";
+  confirmDetails.innerHTML = "";
+  (opts.sections || []).forEach(section=>{
+    if (section.text){
+      const p = document.createElement("p");
+      p.textContent = section.text;
+      confirmDetails.appendChild(p);
+    }
+    const ul = document.createElement("ul");
+    section.items.forEach(item=>{
+      const li = document.createElement("li");
+      li.textContent = item;
+      ul.appendChild(li);
+    });
+    confirmDetails.appendChild(ul);
+  });
   confirmOverlay.classList.add("show");
   function cleanup(){
     confirmOverlay.classList.remove("show");
@@ -1027,11 +1051,66 @@ function showConnSidebar(conn){
   }
 
   const del = document.createElement("button"); del.className="del-btn"; del.textContent = "Verbindung löschen";
-  del.addEventListener("click", ()=>{
-    state.connections = state.connections.filter(c=>c.id!==conn.id);
-    deselectAll();
-  });
+  del.addEventListener("click", ()=>deleteConnection(conn));
   content.appendChild(del);
+}
+
+/* Events, die ein Ziel nur über diese Verbindung erreichen — gibt es nach dem Löschen
+   noch einen anderen Weg (z. B. Antwortweg einer REST-Anfrage), bleibt das Ziel erhalten.
+   Hat ein betroffenes Event danach noch ein anderes erreichbares Ziel, verliert es nur das
+   unerreichbare Ziel ("modified"); sonst wird es gelöscht ("deleted").
+   Datenbank-Events haben kein festes Ziel und sind daher nie betroffen. */
+function eventsUsingConnection(conn){
+  const remaining = state.connections.filter(c=>c.id!==conn.id);
+  const deleted = [], modified = [];
+  state.nodes.forEach(node=>{
+    if (node.type === "database") return;
+    (node.events||[]).forEach(ev=>{
+      const lostIds = (ev.targetIds||[]).filter(targetId=>{
+        const hop = findConnectionForTravel(node.id, targetId);
+        return hop && hop.conn.id === conn.id && !findConnectionForTravel(node.id, targetId, remaining);
+      });
+      if (!lostIds.length) return;
+      const keepsTarget = ev.targetIds.some(targetId=>
+        !lostIds.includes(targetId) && getNode(targetId) && findConnectionForTravel(node.id, targetId, remaining));
+      (keepsTarget ? modified : deleted).push({node, ev, lostIds});
+    });
+  });
+  return {deleted, modified};
+}
+
+function deleteConnection(conn){
+  const {deleted, modified} = eventsUsingConnection(conn);
+  function doDelete(){
+    state.connections = state.connections.filter(c=>c.id!==conn.id);
+    deleted.forEach(({node, ev})=>{
+      node.events = node.events.filter(e=>e.id!==ev.id);
+    });
+    modified.forEach(({ev, lostIds})=>{
+      ev.targetIds = ev.targetIds.filter(id=>!lostIds.includes(id));
+    });
+    deselectAll();
+  }
+  if (!deleted.length && !modified.length){ doDelete(); return; }
+
+  const evLabel = ({node, ev}) => node.name + ": " + (ev.name || "(Event)");
+  const lostLabel = ({lostIds}) => lostIds.map(id=>getNode(id).name).join(", ");
+  const sections = [];
+  if (deleted.length){
+    sections.push({items: deleted.map(evLabel)});
+  }
+  if (modified.length){
+    sections.push({
+      text: deleted.length
+        ? "Außerdem sind folgende Events betroffen — sie bleiben erhalten, verlieren aber ein Ziel:"
+        : "",
+      items: modified.map(m=>evLabel(m) + " (Ziel „" + lostLabel(m) + "“ wird entfernt)")
+    });
+  }
+  const message = deleted.length
+    ? "Diese Verbindung wird von Events verwendet. Beim Löschen der Verbindung werden diese Events gelöscht:"
+    : "Diese Verbindung wird von Events verwendet. Folgende Events bleiben erhalten, verlieren beim Löschen der Verbindung aber ein Ziel:";
+  showConfirm(message, doDelete, {yesLabel:"OK", sections});
 }
 
 /* ============================================================
@@ -1098,10 +1177,11 @@ function eventTargetOptions(node){
    kann — bevorzugt die direkte abgehende Verbindung; falls es nur eine eingehende
    REST- oder Datenbank-Verbindung vom Ziel gibt, wird diese als Antwortweg genutzt
    (Animation dann in umgekehrter Pfeilrichtung). */
-function findConnectionForTravel(fromId, toId){
-  const direct = state.connections.find(c=>c.from===fromId && c.to===toId);
+function findConnectionForTravel(fromId, toId, connections){
+  connections = connections || state.connections;
+  const direct = connections.find(c=>c.from===fromId && c.to===toId);
   if (direct) return {conn:direct, reversed:false};
-  const response = state.connections.find(c=>c.from===toId && c.to===fromId && (c.type==="rest" || c.type==="db"));
+  const response = connections.find(c=>c.from===toId && c.to===fromId && (c.type==="rest" || c.type==="db"));
   if (response) return {conn:response, reversed:true};
   return null;
 }
@@ -1803,6 +1883,7 @@ document.getElementById("file-import").addEventListener("change", e=>{
 
 /* keyboard delete */
 window.addEventListener("keydown", e=>{
+  if (confirmOverlay.classList.contains("show")) return;
   if ((e.key === "Delete" || e.key === "Backspace") && document.activeElement.tagName !== "INPUT" && document.activeElement.tagName !== "TEXTAREA"){
     if (selectedNodeId){
       state.nodes = state.nodes.filter(n=>n.id!==selectedNodeId);
@@ -1810,8 +1891,8 @@ window.addEventListener("keydown", e=>{
       cleanupEventTargets(selectedNodeId);
       deselectAll();
     } else if (selectedConnId){
-      state.connections = state.connections.filter(c=>c.id!==selectedConnId);
-      deselectAll();
+      const conn = state.connections.find(c=>c.id===selectedConnId);
+      if (conn) deleteConnection(conn);
     }
   }
 });
