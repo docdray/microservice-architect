@@ -6,8 +6,27 @@ export interface Point { x: number; y: number }
 const NODE_W: Record<NodeType, number> = { service: 150, frontend: 150, database: 130 };
 const NODE_H: Record<NodeType, number> = { service: 64, frontend: 64, database: 74 };
 
-export function nodeSize(node: Pick<DiagramNode, "type">) {
-  return { w: NODE_W[node.type], h: NODE_H[node.type] };
+/* Elemente wachsen mit ihrem Namen in die Breite (symmetrisch um ihre Mitte), höchstens bis
+   NODE_MAX_W; längere Namen werden gekürzt. Die Schrift ist monospace (13px, Zeichenbreite
+   ≈ 0,6em), daher lässt sich die Textbreite ohne Messung im DOM abschätzen. */
+const LABEL_CHAR_W = 8;
+const LABEL_PADDING = 40;
+const NODE_MAX_W = 320;
+const MAX_LABEL_CHARS = Math.floor((NODE_MAX_W - LABEL_PADDING) / LABEL_CHAR_W);
+
+/* Angezeigter Name: bei Überlänge mit "…" gekürzt */
+export function nodeLabel(node: Pick<DiagramNode, "name">): string {
+  return node.name.length > MAX_LABEL_CHARS ? node.name.slice(0, MAX_LABEL_CHARS - 1) + "…" : node.name;
+}
+
+export function nodeSize(node: Pick<DiagramNode, "type" | "name">) {
+  const textW = nodeLabel(node).length * LABEL_CHAR_W + LABEL_PADDING;
+  return { w: Math.max(NODE_W[node.type], textW), h: NODE_H[node.type] };
+}
+
+/* Breite eines Text-Labels (Verbindungsbeschreibung, fliegendes Event) bei 10,5px monospace */
+export function smallLabelWidth(text: string): number {
+  return text.length * 6.4 + 16;
 }
 
 /* Schnittpunkt der Linie zwischen zwei Mittelpunkten mit dem Rand des Elements */

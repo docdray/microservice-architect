@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Editor } from "../editor.svelte";
   import type { DiagramNode, HandleType } from "../model/types";
-  import { nodeSize } from "../model/geometry";
+  import { nodeLabel, nodeSize } from "../model/geometry";
   import { TYPE_META } from "../ui/meta";
   import Marker from "./Marker.svelte";
 
@@ -9,6 +9,7 @@
 
   const meta = $derived(TYPE_META[node.type]);
   const size = $derived(nodeSize(node));
+  const label = $derived(nodeLabel(node));
   const w = $derived(size.w);
   const h = $derived(size.h);
   const selected = $derived(ed.selection?.kind === "node" && ed.selection.id === node.id);
@@ -43,7 +44,7 @@
       d="M {-w / 2},{-h / 2 + ELL_H} A {w / 2},{ELL_H} 0 0 1 {w / 2},{-h / 2 + ELL_H} L {w / 2},{h / 2 - ELL_H} A {w / 2},{ELL_H} 0 0 1 {-w / 2},{h / 2 - ELL_H} Z"></path>
     <ellipse cx="0" cy={-h / 2 + ELL_H} rx={w / 2} ry={ELL_H} fill="#0f2a1c" stroke={meta.stroke} stroke-width="1.6"></ellipse>
   {:else}
-    <rect class="node-rect" x={-w / 2} y={-h / 2} width={w} height={h} fill={meta.fill} stroke={meta.stroke}></rect>
+    <rect class="node-rect" x={-w / 2} y={-h / 2} width={w} height={h} rx="9" fill={meta.fill} stroke={meta.stroke}></rect>
   {/if}
 
   {#if selected}
@@ -51,7 +52,7 @@
       rx={node.type === "database" ? 12 : 14} fill="none" stroke={meta.stroke}></rect>
   {/if}
 
-  <text class="node-label" x="0" y="2" text-anchor="middle">{node.name}</text>
+  <text class="node-label" x="0" y="2" text-anchor="middle">{label}{#if label !== node.name}<title>{node.name}</title>{/if}</text>
   <text class="node-sublabel" x="0" y={h / 2 - 8} text-anchor="middle">{meta.label}</text>
 
   {#if node.type === "service" && node.offersRest}

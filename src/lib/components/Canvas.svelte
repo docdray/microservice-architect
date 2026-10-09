@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Editor } from "../editor.svelte";
+  import { smallLabelWidth } from "../model/geometry";
   import NodeShape from "./NodeShape.svelte";
   import ConnectionShape from "./ConnectionShape.svelte";
 
@@ -68,7 +69,7 @@
     </g>
     <g id="simLayer">
       {#each ed.sim.flights as f (f.id)}
-        {@const w = Math.max(34, f.label.length * 6.4 + 16)}
+        {@const w = Math.max(34, smallLabelWidth(f.label))}
         <g class="sim-event" transform="translate({f.x},{f.y})">
           <rect x={-w / 2} y="-11" width={w} height="22" rx="11" class="sim-event-bg"></rect>
           <text x="0" y="4" text-anchor="middle" class="sim-event-text">{f.label}</text>

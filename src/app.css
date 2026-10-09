@@ -59,7 +59,7 @@ button.tbtn:disabled{opacity:.4;cursor:default;background:#121923;border-color:v
   position:absolute;top:14px;right:14px;width:280px;
   background:var(--panel);border:1px solid var(--panel-border);
   border-radius:10px;padding:16px;box-shadow:0 6px 24px rgba(0,0,0,.5);
-  z-index:10;display:none;max-height:calc(100vh - 28px);overflow:auto;
+  z-index:10;display:none;max-height:calc(100vh - 70px);overflow:auto; /* endet über der Zoom-Anzeige */
 }
 #sidebar.show{display:block;}
 #sidebar h3{margin:0 0 12px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim);}
@@ -149,7 +149,7 @@ button.tbtn:disabled{opacity:.4;cursor:default;background:#121923;border-color:v
 /* ---------- SVG node styling ---------- */
 .node-shape{cursor:grab;}
 .node-shape.dragging{cursor:grabbing;}
-.node-rect{stroke-width:1.6;rx:9;}
+.node-rect{stroke-width:1.6;}
 .node-selected{stroke-width:3 !important;filter:drop-shadow(0 0 6px currentColor);}
 .node-label{font-size:13px;font-weight:600;fill:var(--text);pointer-events:none;user-select:none;}
 .node-sublabel{font-size:9.5px;fill:var(--text-dim);pointer-events:none;user-select:none;letter-spacing:.04em;}

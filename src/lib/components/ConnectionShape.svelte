@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Editor } from "../editor.svelte";
   import type { Connection } from "../model/types";
-  import { connEndpoints } from "../model/geometry";
+  import { connEndpoints, smallLabelWidth } from "../model/geometry";
   import { CONN_META } from "../ui/meta";
 
   let { ed, conn }: { ed: Editor; conn: Connection } = $props();
@@ -14,7 +14,7 @@
   const d = $derived(ep ? `M ${ep.p1.x},${ep.p1.y} L ${ep.p2.x},${ep.p2.y}` : "");
   const MAX_LABEL = 34;
   const label = $derived(conn.description.length > MAX_LABEL ? conn.description.slice(0, MAX_LABEL - 1) + "…" : conn.description);
-  const labelWidth = $derived(Math.min(220, Math.max(40, conn.description.length * 6.2)));
+  const labelWidth = $derived(Math.max(40, smallLabelWidth(label)));
 </script>
 
 {#if ep}
