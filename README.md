@@ -59,7 +59,7 @@ Besonderheiten:
 Das Diagramm wird **nicht automatisch gespeichert** – nach einem Neuladen der Seite ist es verloren.
 
 - **⭳ Export JSON** lädt das Diagramm als `microservice-architektur.json` herunter.
-- **⭱ Import JSON** lädt eine zuvor exportierte Datei.
+- **⭱ Import JSON** lädt eine zuvor exportierte Datei. Die Datei wird vorher vollständig geprüft (gültiges JSON, bekannte Typen, eindeutige IDs, Positionen, existierende Verbindungs- und Event-Ziele). Bei Fehlern erscheint ein Dialog mit allen gefundenen Problemen, und das aktuelle Diagramm bleibt unverändert.
 
 Format:
 

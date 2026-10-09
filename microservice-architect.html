@@ -197,23 +197,26 @@
     border-width:7px 7px 0 7px;border-style:solid;border-color:#101820 transparent transparent transparent;
   }
 
-  #confirmOverlay{
+  #confirmOverlay, #errorOverlay{
     position:absolute;inset:0;background:rgba(3,5,8,.6);z-index:40;
     display:none;align-items:center;justify-content:center;
   }
-  #confirmOverlay.show{display:flex;}
-  #confirmBox{
+  #confirmOverlay.show, #errorOverlay.show{display:flex;}
+  #confirmBox, #errorBox{
     background:var(--panel);border:1px solid var(--panel-border);border-radius:12px;
     padding:20px 22px;max-width:320px;box-shadow:0 12px 40px rgba(0,0,0,.6);
   }
-  #confirmBox p{margin:0 0 16px;font-size:13.5px;line-height:1.5;color:var(--text);}
-  #confirmBox .btnrow{display:flex;gap:10px;justify-content:flex-end;}
-  #confirmBox button{
+  #confirmBox p, #errorBox p{margin:0 0 16px;font-size:13.5px;line-height:1.5;color:var(--text);}
+  #confirmBox .btnrow, #errorBox .btnrow{display:flex;gap:10px;justify-content:flex-end;}
+  #confirmBox button, #errorBox button{
     font:inherit;font-size:12.5px;padding:8px 14px;border-radius:7px;cursor:pointer;
     border:1px solid var(--panel-border);background:#121923;color:var(--text);
   }
   #confirmBox button#confirmYes{background:#2a1216;border-color:#4a1c22;color:var(--danger);}
-  #confirmBox button:hover{filter:brightness(1.2);}
+  #confirmBox button:hover, #errorBox button:hover{filter:brightness(1.2);}
+  #errorBox{max-width:440px;}
+  #errorBox h4{margin:0 0 10px;font-size:14px;color:var(--danger);}
+  #errorList{margin:0 0 16px;padding-left:18px;font-size:12.5px;line-height:1.5;color:var(--text);max-height:260px;overflow:auto;}
   #hint-toast{
     position:absolute;top:14px;left:50%;transform:translateX(-50%);
     background:#132033;border:1px solid #23405c;color:#bcdcff;padding:8px 16px;
@@ -289,6 +292,17 @@
       <div class="btnrow">
         <button id="confirmNo">Abbrechen</button>
         <button id="confirmYes">Löschen</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="errorOverlay">
+    <div id="errorBox">
+      <h4 id="errorTitle"></h4>
+      <p id="errorMsg"></p>
+      <ul id="errorList"></ul>
+      <div class="btnrow">
+        <button id="errorOk">OK</button>
       </div>
     </div>
   </div>
@@ -491,6 +505,31 @@ function showConfirm(message, onConfirm){
   function onNo(){ cleanup(); }
   confirmYes.addEventListener("click", onYes);
   confirmNo.addEventListener("click", onNo);
+}
+
+/* ---- Fehlerdialog mit Liste einzelner Fehlermeldungen ---- */
+const errorOverlay = document.getElementById("errorOverlay");
+document.getElementById("errorOk").addEventListener("click", ()=>{
+  errorOverlay.classList.remove("show");
+});
+function showErrors(title, message, errors){
+  const MAX_SHOWN = 15;
+  document.getElementById("errorTitle").textContent = title;
+  document.getElementById("errorMsg").textContent = message;
+  const list = document.getElementById("errorList");
+  list.innerHTML = "";
+  errors.slice(0, MAX_SHOWN).forEach(err=>{
+    const li = document.createElement("li");
+    li.textContent = err;
+    list.appendChild(li);
+  });
+  if (errors.length > MAX_SHOWN){
+    const li = document.createElement("li");
+    li.textContent = "… und " + (errors.length - MAX_SHOWN) + " weitere Fehler.";
+    list.appendChild(li);
+  }
+  list.style.display = errors.length ? "" : "none";
+  errorOverlay.classList.add("show");
 }
 
 /* edge point: intersection of the line between two node centers and node's rect border */
@@ -1443,6 +1482,111 @@ document.getElementById("btn-export").addEventListener("click", ()=>{
   URL.revokeObjectURL(url);
 });
 
+/* Prüft eine Import-Datei vollständig, bevor irgendetwas am aktuellen Diagramm
+   verändert wird. Liefert eine Liste lesbarer Fehlermeldungen (leer = Datei ist sauber). */
+function validateImport(data){
+  const errors = [];
+  const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
+  const isNonEmptyStr = v => typeof v === "string" && v.trim() !== "";
+  const isNum = v => typeof v === "number" && Number.isFinite(v);
+  const optType = (obj, key, type, where) => {
+    if (obj[key] !== undefined && typeof obj[key] !== type){
+      errors.push(where + ": „" + key + "“ muss vom Typ " + type + " sein.");
+    }
+  };
+
+  if (!isObj(data)){
+    errors.push("Die Datei muss ein JSON-Objekt mit „nodes“ und „connections“ enthalten.");
+    return errors;
+  }
+  if (!Array.isArray(data.nodes)) errors.push("„nodes“ fehlt oder ist keine Liste.");
+  if (!Array.isArray(data.connections)) errors.push("„connections“ fehlt oder ist keine Liste.");
+  if (errors.length) return errors;
+
+  const nodeIds = new Set();
+  const eventIds = new Set();
+  const nodeTypes = Object.keys(TYPE_META);
+  data.nodes.forEach((n, i)=>{
+    let where = "Element " + (i+1);
+    if (!isObj(n)){ errors.push(where + ": ist kein Objekt."); return; }
+    if (isNonEmptyStr(n.name)) where += " („" + n.name + "“)";
+
+    if (!isNonEmptyStr(n.id)) errors.push(where + ": „id“ fehlt oder ist leer.");
+    else if (nodeIds.has(n.id)) errors.push(where + ": ID „" + n.id + "“ ist mehrfach vergeben.");
+    else nodeIds.add(n.id);
+
+    if (!nodeTypes.includes(n.type)){
+      errors.push(where + ": unbekannter Typ „" + n.type + "“ (erlaubt: " + nodeTypes.join(", ") + ").");
+    }
+    if (typeof n.name !== "string") errors.push(where + ": „name“ fehlt oder ist kein Text.");
+    if (!isNum(n.x) || !isNum(n.y)) errors.push(where + ": Position „x“/„y“ fehlt oder ist keine Zahl.");
+    optType(n, "description", "string", where);
+    optType(n, "offersRest", "boolean", where);
+
+    if (n.events !== undefined && !Array.isArray(n.events)){
+      errors.push(where + ": „events“ ist keine Liste.");
+    }
+  });
+
+  // Events erst nach allen Elementen prüfen, damit Ziel-IDs auf beliebige Elemente verweisen dürfen.
+  data.nodes.forEach((n, i)=>{
+    if (!isObj(n) || !Array.isArray(n.events)) return;
+    const nodeWhere = "Element " + (i+1) + (isNonEmptyStr(n.name) ? " („" + n.name + "“)" : "");
+    n.events.forEach((ev, j)=>{
+      const where = nodeWhere + ", Event " + (j+1);
+      if (!isObj(ev)){ errors.push(where + ": ist kein Objekt."); return; }
+      if (!isNonEmptyStr(ev.id)) errors.push(where + ": „id“ fehlt oder ist leer.");
+      else if (eventIds.has(ev.id)) errors.push(where + ": ID „" + ev.id + "“ ist mehrfach vergeben.");
+      else eventIds.add(ev.id);
+      if (typeof ev.name !== "string") errors.push(where + ": „name“ fehlt oder ist kein Text.");
+      if (typeof ev.trigger !== "string") errors.push(where + ": „trigger“ fehlt oder ist kein Text.");
+      if (ev.targetIds !== undefined){
+        if (!Array.isArray(ev.targetIds)) errors.push(where + ": „targetIds“ ist keine Liste.");
+        else ev.targetIds.forEach(t=>{
+          if (!nodeIds.has(t)) errors.push(where + ": Ziel „" + t + "“ existiert nicht.");
+        });
+      }
+    });
+  });
+
+  const connIds = new Set();
+  const connTypes = Object.keys(CONN_META);
+  data.connections.forEach((c, i)=>{
+    const where = "Verbindung " + (i+1) + (isObj(c) && isNonEmptyStr(c.id) ? " („" + c.id + "“)" : "");
+    if (!isObj(c)){ errors.push(where + ": ist kein Objekt."); return; }
+    if (!isNonEmptyStr(c.id)) errors.push(where + ": „id“ fehlt oder ist leer.");
+    else if (connIds.has(c.id)) errors.push(where + ": ID ist mehrfach vergeben.");
+    else connIds.add(c.id);
+    if (!connTypes.includes(c.type)){
+      errors.push(where + ": unbekannter Typ „" + c.type + "“ (erlaubt: " + connTypes.join(", ") + ").");
+    }
+    if (!nodeIds.has(c.from)) errors.push(where + ": Start-Element „" + c.from + "“ existiert nicht.");
+    if (!nodeIds.has(c.to)) errors.push(where + ": Ziel-Element „" + c.to + "“ existiert nicht.");
+    if (c.from !== undefined && c.from === c.to) errors.push(where + ": verbindet ein Element mit sich selbst.");
+    optType(c, "description", "string", where);
+    optType(c, "websocket", "boolean", where);
+  });
+
+  return errors;
+}
+
+/* Ergänzt optionale Felder mit Standardwerten (nur für bereits geprüfte Daten). */
+function normalizeImport(data){
+  return {
+    nodes: data.nodes.map(n=>({
+      ...n,
+      description: n.description || "",
+      offersRest: n.type === "service" && !!n.offersRest,
+      events: (n.events || []).map(ev=>({...ev, targetIds: ev.targetIds || []}))
+    })),
+    connections: data.connections.map(c=>({
+      ...c,
+      description: c.description || "",
+      websocket: !!c.websocket
+    }))
+  };
+}
+
 document.getElementById("btn-import").addEventListener("click", ()=>{
   document.getElementById("file-import").click();
 });
@@ -1451,17 +1595,25 @@ document.getElementById("file-import").addEventListener("change", e=>{
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
+    const failTitle = "Import fehlgeschlagen";
+    const failMsg = "Die Datei „" + file.name + "“ wurde nicht importiert. Das aktuelle Diagramm bleibt unverändert.";
+    let data;
     try{
-      const data = JSON.parse(reader.result);
-      if (!Array.isArray(data.nodes) || !Array.isArray(data.connections)) throw new Error("Ungültiges Format");
-      data.nodes.forEach(n=>{ n.events = Array.isArray(n.events) ? n.events : []; });
-      stopSimulation();
-      state = {nodes:data.nodes, connections:data.connections};
-      deselectAll();
-      toast("Diagramm importiert.");
+      data = JSON.parse(reader.result);
     } catch(err){
-      toast("Import fehlgeschlagen: " + err.message, 4000);
+      showErrors(failTitle, failMsg, ["Die Datei ist kein gültiges JSON: " + err.message]);
+      return;
     }
+    const errors = validateImport(data);
+    if (errors.length){
+      showErrors(failTitle, failMsg, errors);
+      return;
+    }
+    // Erst nach erfolgreicher Prüfung wird der bestehende Zustand ersetzt.
+    stopSimulation();
+    state = normalizeImport(data);
+    deselectAll();
+    toast("Diagramm importiert.");
   };
   reader.readAsText(file);
   e.target.value = "";
