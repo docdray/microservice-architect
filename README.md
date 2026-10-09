@@ -2,11 +2,18 @@
 
 Ein browserbasierter Editor, um Microservice-Architekturen zu skizzieren und den Fluss von Events zwischen den Komponenten animiert zu simulieren.
 
-Das gesamte Tool steckt in einer einzigen Datei – `microservice-architect.html` – ohne Build-Schritt, Server oder externe Abhängigkeiten.
+Das Tool ist mit Svelte 5 und TypeScript gebaut und wird zu einer einzigen HTML-Datei gebündelt, die ohne Server direkt im Browser läuft.
 
 ## Starten
 
-`microservice-architect.html` einfach im Browser öffnen. Beim Start wird ein Beispieldiagramm (Web-Frontend, Auth-Service, Order-Service, Order-DB) geladen.
+```sh
+npm install
+npm run build
+```
+
+Danach `dist/index.html` im Browser öffnen. Beim Start wird ein Beispieldiagramm (Web-Frontend, Auth-Service, Order-Service, Order-DB) geladen.
+
+Für die Entwicklung mit automatischem Neuladen: `npm run dev`.
 
 ## Funktionen
 
@@ -111,13 +118,41 @@ Format:
 
 `type` eines Knotens ist `service`, `frontend` oder `database`; `type` einer Verbindung ist `rest`, `event` oder `db`. Der Trigger-Wert `__button__` steht für „nur manuell per Button“.
 
-## Aufbau des Codes
+## Entwicklung
 
-Alles liegt in `microservice-architect.html`: CSS im `<style>`-Block, das Markup für Toolbar, Seitenleiste und Legende, und ein einzelnes `<script>` (Vanilla JS, SVG-Rendering). Das Skript ist in Abschnitte gegliedert:
+| Befehl | Zweck |
+| --- | --- |
+| `npm run dev` | Entwicklungsserver mit automatischem Neuladen |
+| `npm run build` | Einzelne HTML-Datei nach `dist/index.html` bauen |
+| `npm run check` | Typprüfung (TypeScript + Svelte) |
+| `npm test` | Unit-Tests der Fachlogik (Vitest) |
+| `npm run test:e2e` | Bauen und Ende-zu-Ende-Tests im Browser (Playwright) |
+| `npm run test:e2e:legacy` | Dieselben E2E-Tests gegen die alte Einzeldatei in `legacy/` |
 
-- **STATE** – `state.nodes` / `state.connections` als einzige Datenquelle
-- **VIEW** – Zoom und Verschieben (`view`, `screenToWorld`)
-- **Rendering** – `render()` baut die SVG-Layer bei jeder Änderung neu auf
-- **SELECTION / SIDEBAR** – Bearbeitungsformulare für Elemente und Verbindungen
-- **SIMULATOR** – `fireEvent` → `travelEvent` (Animation per `requestAnimationFrame`) → `triggerNode`
-- **TOOLBAR ACTIONS** – Hinzufügen, Export/Import, Löschen
+Für die E2E-Tests wird Chromium benötigt: einmalig `npx playwright install chromium`, oder einen vorhandenen Chromium über die Umgebungsvariable `CHROMIUM_PATH` angeben.
+
+### Aufbau des Codes
+
+```
+src/
+  lib/model/        Fachlogik ohne UI – reine TypeScript-Module
+    types.ts          Datenmodell (entspricht dem JSON-Export)
+    diagram.ts        Abfragen, ID-Vergabe, Wege zwischen Elementen
+    rules.ts          Verbindungsregeln, Duplikatprüfung
+    eventGraph.ts     Event-Graph, Zyklus-Erkennung
+    openEnds.ts       Erkennung offener Enden
+    editing.ts        Bearbeitungsoperationen (Anlegen, Löschen, …)
+    simulation.ts     Wohin ein Event fliegt, was es auslöst
+    importExport.ts   Prüfen, Einlesen und Schreiben von JSON
+    history.ts        Verlauf für Rückgängig/Wiederholen
+    geometry.ts       Größen, Kantenpunkte, Trefferprüfung
+  lib/editor.svelte.ts  Zentraler Zustand (Svelte-Runes), Interaktionen, Simulation
+  lib/components/   Svelte-Komponenten (Canvas, Elemente, Seitenleiste, Dialoge, …)
+  app.css           Gestaltung
+tests/
+  unit/             Unit-Tests der Fachlogik
+  e2e/              Browser-Tests; stützen sich nur auf stabile IDs/Klassen und den JSON-Export
+legacy/             Ursprüngliche Einzeldatei (Referenz während der Portierung)
+```
+
+Die Fachlogik kennt keinen globalen Zustand und lässt sich ohne Browser testen. Die Oberfläche leitet Zyklen und offene Enden reaktiv aus dem Diagramm ab (`$derived`) – es gibt kein manuelles Neuzeichnen.
