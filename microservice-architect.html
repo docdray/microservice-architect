@@ -828,11 +828,16 @@ function startNodeDrag(node, e){
     offX: startWorld.x - node.x,
     offY: startWorld.y - node.y
   };
+  // Ziehen erst ab einer Gesamtstrecke in Bildschirmpixeln seit dem Klick — unabhängig von
+  // Zoom und Mausgeschwindigkeit. Kleineres Zittern zählt als Klick und verschiebt nichts.
+  const DRAG_THRESHOLD_PX = 3;
   function onMove(ev){
+    if (!dragCtx.moved){
+      if (Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) <= DRAG_THRESHOLD_PX) return;
+      dragCtx.moved = true;
+    }
     const w = screenToWorld(ev.clientX, ev.clientY);
-    const nx = w.x - dragCtx.offX, ny = w.y - dragCtx.offY;
-    if (Math.abs(nx-node.x) > 1 || Math.abs(ny-node.y) > 1) dragCtx.moved = true;
-    node.x = nx; node.y = ny;
+    node.x = w.x - dragCtx.offX; node.y = w.y - dragCtx.offY;
     render();
   }
   function onUp(ev){
