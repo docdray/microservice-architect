@@ -23,6 +23,7 @@
     --accent-dbconn:#6e7a8a;
     --accent-sim:#ffd85c;
     --danger:#f0555f;
+    --warn:#ffa94d;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;height:100%;overflow:hidden;background:var(--bg);
@@ -52,6 +53,7 @@
   }
   button.tbtn:hover{background:#1a2430;border-color:#2a3646;}
   button.tbtn.active{background:#213146;border-color:var(--accent-service);}
+  button.tbtn:disabled{opacity:.4;cursor:default;background:#121923;border-color:var(--panel-border);}
   .dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none;}
 
   /* ---------- Sidebar ---------- */
@@ -188,6 +190,11 @@
   .cycle-marker{cursor:help;}
   .cycle-marker circle{fill:#2a1216;stroke:var(--danger);stroke-width:1.8;transition:filter .1s;}
   .cycle-marker text{font-size:12px;font-weight:800;fill:var(--danger);pointer-events:none;user-select:none;}
+  .open-marker{cursor:help;}
+  .legend-marker{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;border:1.5px solid;font-size:10px;font-weight:800;margin-right:8px;flex:none;}
+  .open-marker circle{fill:#2a1d0c;stroke:var(--warn);stroke-width:1.8;}
+  .open-marker text{font-size:12px;font-weight:800;fill:var(--warn);pointer-events:none;user-select:none;}
+  .open-marker:hover circle{filter:drop-shadow(0 0 5px var(--warn));}
   .cycle-marker.cycle-glow circle{fill:#4a1c22;filter:drop-shadow(0 0 5px var(--danger)) drop-shadow(0 0 12px var(--danger));}
 
   #tooltip, #cycle-tooltip{
@@ -207,6 +214,13 @@
   #cycle-tooltip h5{margin:0 0 6px;font-size:12.5px;color:var(--danger);}
   #cycle-tooltip h5:not(:first-child){margin-top:10px;}
   #cycle-tooltip ol{margin:0;padding-left:26px;}
+  #cycle-tooltip ul{margin:0;padding-left:18px;}
+  #cycle-tooltip h5.open-ends{color:var(--warn);}
+  .warn-text{color:var(--warn);}
+  .target-dd-row.open span{color:var(--warn);}
+  .target-dropdown-btn.warn-text{color:var(--warn);}
+  .rename-hint{margin-top:8px;padding:8px 10px;border:1px solid #4a3a1c;border-radius:7px;background:#1c160c;color:var(--warn);font-size:11.5px;line-height:1.45;}
+  .rename-hint button{margin-top:6px;color:var(--warn);border-color:#4a3a1c;}
   #cycle-tooltip .ev-name{color:var(--accent-sim);font-weight:600;}
   #cycle-tooltip .more{margin-top:4px;color:var(--text-dim);font-size:11.5px;}
 
@@ -228,9 +242,6 @@
   #confirmBox button#confirmYes{background:#2a1216;border-color:#4a1c22;color:var(--danger);}
   #confirmBox button:hover, #errorBox button:hover{filter:brightness(1.2);}
   #errorBox{max-width:440px;}
-  #confirmDetails{max-height:260px;overflow:auto;margin:-6px 0 0;}
-  #confirmDetails ul{margin:0 0 16px;padding-left:18px;font-size:12.5px;line-height:1.5;color:var(--text);}
-  #confirmDetails p{margin:0 0 6px;}
   #errorBox h4{margin:0 0 10px;font-size:14px;color:var(--danger);}
   #errorList{margin:0 0 16px;padding-left:18px;font-size:12.5px;line-height:1.5;color:var(--text);max-height:260px;overflow:auto;}
   #hint-toast{
@@ -286,6 +297,10 @@
       <button class="tbtn" id="btn-add-db"><span class="dot" style="background:var(--accent-db)"></span>+ Datenbank</button>
     </div>
     <div class="grp">
+      <button class="tbtn" id="btn-undo" title="Rückgängig (Strg+Z)" disabled>↶ Rückgängig</button>
+      <button class="tbtn" id="btn-redo" title="Wiederholen (Strg+Y / Strg+Umschalt+Z)" disabled>↷ Wiederholen</button>
+    </div>
+    <div class="grp">
       <button class="tbtn" id="btn-export">⭳ Export JSON</button>
       <button class="tbtn" id="btn-import">⭱ Import JSON</button>
       <input type="file" id="file-import" accept="application/json" style="display:none;">
@@ -306,7 +321,6 @@
   <div id="confirmOverlay">
     <div id="confirmBox">
       <p id="confirmMsg"></p>
-      <div id="confirmDetails"></div>
       <div class="btnrow">
         <button id="confirmNo">Abbrechen</button>
         <button id="confirmYes">Löschen</button>
@@ -339,6 +353,8 @@
     <div class="row" style="color:var(--accent-event)"><span class="swatch" style="background:var(--accent-event)"></span>Event-Verbindung →</div>
     <div class="row" style="color:var(--accent-dbconn)"><span class="swatch dashed" style="color:var(--accent-dbconn)"></span>Datenbank-Verbindung</div>
     <div class="row" style="color:var(--accent-sim)"><span class="swatch" style="background:var(--accent-sim)"></span>Simulierter Event-Fluss</div>
+    <div class="row" style="color:var(--danger)"><span class="legend-marker" style="border-color:var(--danger)">!</span>Zyklus in Event-Kette</div>
+    <div class="row" style="color:var(--warn)"><span class="legend-marker" style="border-color:var(--warn)">?</span>Offene Enden (Ziel / Trigger)</div>
   </div>
 
   <div id="zoomlabel">Zoom: <span id="zoomval">100%</span></div>
@@ -367,7 +383,8 @@ let state = {
     {id:"c2", type:"rest", from:"n1", to:"n3", description:"Bestellungen abrufen", websocket:false},
     {id:"c3", type:"event", from:"n3", to:"n2", description:"OrderCreated", websocket:false},
     {id:"c4", type:"db", from:"n3", to:"n4", description:"", websocket:false}
-  ]
+  ],
+  deletedNodes: {} // id → Name gelöschter Elemente, auf die noch Event-Ziele verweisen
 };
 
 let selectedNodeId = null;
@@ -473,7 +490,8 @@ document.getElementById("btn-reset-view").addEventListener("click", ()=>{
    enthalten, die der Zähler dieser Sitzung noch nicht kennt. */
 function idInUse(id){
   return state.connections.some(c=>c.id===id) ||
-    state.nodes.some(n=>n.id===id || (n.events||[]).some(e=>e.id===id));
+    id in (state.deletedNodes || {}) ||
+    state.nodes.some(n=>n.id===id || (n.events||[]).some(e=>e.id===id || (e.targetIds||[]).includes(id)));
 }
 function uid(prefix){
   let id;
@@ -513,28 +531,8 @@ const confirmOverlay = document.getElementById("confirmOverlay");
 const confirmMsg = document.getElementById("confirmMsg");
 const confirmYes = document.getElementById("confirmYes");
 const confirmNo = document.getElementById("confirmNo");
-const confirmDetails = document.getElementById("confirmDetails");
-/* opts.yesLabel: Text des Bestätigungs-Buttons (Standard „Löschen“),
-   opts.sections: optionale Abschnitte [{text, items:[…]}] unter der Meldung */
-function showConfirm(message, onConfirm, opts){
-  opts = opts || {};
+function showConfirm(message, onConfirm){
   confirmMsg.textContent = message;
-  confirmYes.textContent = opts.yesLabel || "Löschen";
-  confirmDetails.innerHTML = "";
-  (opts.sections || []).forEach(section=>{
-    if (section.text){
-      const p = document.createElement("p");
-      p.textContent = section.text;
-      confirmDetails.appendChild(p);
-    }
-    const ul = document.createElement("ul");
-    section.items.forEach(item=>{
-      const li = document.createElement("li");
-      li.textContent = item;
-      ul.appendChild(li);
-    });
-    confirmDetails.appendChild(ul);
-  });
   confirmOverlay.classList.add("show");
   function cleanup(){
     confirmOverlay.classList.remove("show");
@@ -631,7 +629,9 @@ function getConnOffset(conn){
    RENDER
    ============================================================ */
 function render(){
-  currentCycles = detectCycles();
+  const graph = buildEventGraph();
+  currentCycles = detectCycles(graph);
+  currentOpenEnds = computeOpenEnds(graph);
   renderConnections();
   renderNodes();
 }
@@ -707,9 +707,10 @@ function buildNodeEl(node){
     g.appendChild(buildHandle(node, w, h, "event", 1, "var(--accent-event)", "E"));
   }
 
-  if (currentCycles.some(c=>c.nodeIds.has(node.id))){
-    g.appendChild(buildCycleMarker(node, h));
-  }
+  const hasCycle = currentCycles.some(c=>c.nodeIds.has(node.id));
+  const hasOpenEnds = currentOpenEnds.has(node.id);
+  if (hasCycle) g.appendChild(buildCycleMarker(node, h, hasOpenEnds ? -12 : 0));
+  if (hasOpenEnds) g.appendChild(buildOpenEndsMarker(node, h, hasCycle ? 12 : 0));
 
   // interactions
   g.addEventListener("mousedown", e=>{
@@ -1072,85 +1073,21 @@ function showConnSidebar(conn){
   content.appendChild(del);
 }
 
-/* Events, die durch das Entfernen von Verbindungen (und ggf. eines Elements) ein Ziel
-   verlieren. Ein Ziel geht verloren, wenn es das entfernte Element ist oder nur über eine
-   der entfernten Verbindungen erreichbar war — gibt es noch einen anderen Weg (z. B. den
-   Antwortweg einer REST-Anfrage), bleibt es erhalten. Hat ein betroffenes Event danach noch
-   ein anderes erreichbares Ziel, verliert es nur die unerreichbaren Ziele ("modified");
-   sonst wird es gelöscht ("deleted"). Datenbank-Events haben kein festes Ziel und sind
-   daher nie betroffen. */
-function eventsLosingTargets(remainingConnections, removedNodeId){
-  const deleted = [], modified = [];
-  state.nodes.forEach(node=>{
-    if (node.type === "database" || node.id === removedNodeId) return;
-    (node.events||[]).forEach(ev=>{
-      const targetIds = ev.targetIds || [];
-      const lostIds = targetIds.filter(targetId=>
-        targetId === removedNodeId ||
-        (findConnectionForTravel(node.id, targetId) && !findConnectionForTravel(node.id, targetId, remainingConnections)));
-      if (!lostIds.length) return;
-      const keepsTarget = targetIds.some(targetId=>
-        !lostIds.includes(targetId) && getNode(targetId) && findConnectionForTravel(node.id, targetId, remainingConnections));
-      (keepsTarget ? modified : deleted).push({node, ev, lostIds});
-    });
-  });
-  return {deleted, modified};
-}
-
-function applyEventLosses({deleted, modified}){
-  deleted.forEach(({node, ev})=>{
-    node.events = node.events.filter(e=>e.id!==ev.id);
-  });
-  modified.forEach(({ev, lostIds})=>{
-    ev.targetIds = ev.targetIds.filter(id=>!lostIds.includes(id));
-  });
-}
-
-/* Führt doDelete direkt aus, wenn keine Events betroffen sind — sonst erst nach Rückfrage.
-   subject: z. B. "Diese Verbindung" / "Dieses Element", what: "der Verbindung" / "des Elements" */
-function confirmEventLosses(losses, subject, what, doDelete){
-  const {deleted, modified} = losses;
-  if (!deleted.length && !modified.length){ doDelete(); return; }
-
-  const evLabel = ({node, ev}) => node.name + ": " + (ev.name || "(Event)");
-  const lostLabel = ({lostIds}) => lostIds.map(id=>getNode(id).name).join(", ");
-  const sections = [];
-  if (deleted.length){
-    sections.push({items: deleted.map(evLabel)});
-  }
-  if (modified.length){
-    sections.push({
-      text: deleted.length
-        ? "Außerdem sind folgende Events betroffen — sie bleiben erhalten, verlieren aber ein Ziel:"
-        : "",
-      items: modified.map(m=>evLabel(m) + " (Ziel „" + lostLabel(m) + "“ wird entfernt)")
-    });
-  }
-  const message = deleted.length
-    ? subject + " wird von Events verwendet. Beim Löschen " + what + " werden diese Events gelöscht:"
-    : subject + " wird von Events verwendet. Folgende Events bleiben erhalten, verlieren beim Löschen " + what + " aber ein Ziel:";
-  showConfirm(message, doDelete, {yesLabel:"OK", sections});
-}
-
+/* Löschen räumt Events bewusst nicht auf: Ziele, die danach nicht mehr erreichbar sind
+   oder auf ein gelöschtes Element zeigen, bleiben als offene Enden stehen und werden
+   markiert (siehe "Offene Enden"). Rückgängig macht das Löschen vollständig ungeschehen. */
 function deleteConnection(conn){
-  const remaining = state.connections.filter(c=>c.id!==conn.id);
-  const losses = eventsLosingTargets(remaining);
-  confirmEventLosses(losses, "Diese Verbindung", "der Verbindung", ()=>{
-    state.connections = remaining;
-    applyEventLosses(losses);
-    deselectAll();
-  });
+  state.connections = state.connections.filter(c=>c.id!==conn.id);
+  deselectAll();
 }
 
 function deleteNode(node){
-  const remaining = state.connections.filter(c=>c.from!==node.id && c.to!==node.id);
-  const losses = eventsLosingTargets(remaining, node.id);
-  confirmEventLosses(losses, "Dieses Element", "des Elements", ()=>{
-    state.nodes = state.nodes.filter(n=>n.id!==node.id);
-    state.connections = remaining;
-    applyEventLosses(losses);
-    deselectAll();
-  });
+  state.nodes = state.nodes.filter(n=>n.id!==node.id);
+  state.connections = state.connections.filter(c=>c.from!==node.id && c.to!==node.id);
+  // Namen merken, damit verbleibende Ziele "gelöscht: Name" anzeigen können
+  state.deletedNodes = {...(state.deletedNodes || {}), [node.id]: node.name};
+  pruneDeletedNodes();
+  deselectAll();
 }
 
 /* ============================================================
@@ -1217,11 +1154,10 @@ function eventTargetOptions(node){
    kann — bevorzugt die direkte abgehende Verbindung; falls es nur eine eingehende
    REST- oder Datenbank-Verbindung vom Ziel gibt, wird diese als Antwortweg genutzt
    (Animation dann in umgekehrter Pfeilrichtung). */
-function findConnectionForTravel(fromId, toId, connections){
-  connections = connections || state.connections;
-  const direct = connections.find(c=>c.from===fromId && c.to===toId);
+function findConnectionForTravel(fromId, toId){
+  const direct = state.connections.find(c=>c.from===fromId && c.to===toId);
   if (direct) return {conn:direct, reversed:false};
-  const response = connections.find(c=>c.from===toId && c.to===fromId && (c.type==="rest" || c.type==="db"));
+  const response = state.connections.find(c=>c.from===toId && c.to===fromId && (c.type==="rest" || c.type==="db"));
   if (response) return {conn:response, reversed:true};
   return null;
 }
@@ -1268,8 +1204,8 @@ function buildEventGraph(){
 
 /* Stark zusammenhängende Komponenten (Tarjan); jede mit mehr als einem Zustand
    oder einer Selbstschleife ist ein Zyklus. */
-function detectCycles(){
-  const {states, edges} = buildEventGraph();
+function detectCycles(graph){
+  const {states, edges} = graph;
   const index = new Map(), low = new Map(), onStack = new Set(), stack = [];
   const cycles = [];
   let counter = 0;
@@ -1371,8 +1307,8 @@ function setCycleMarkerGlow(cycles, on){
   }));
 }
 
-function buildCycleMarker(node, h){
-  const grp = svgEl("g", {class:"cycle-marker", "data-node":node.id, transform:`translate(0,${-h/2 - 16})`});
+function buildCycleMarker(node, h, dx){
+  const grp = svgEl("g", {class:"cycle-marker", "data-node":node.id, transform:`translate(${dx},${-h/2 - 16})`});
   grp.appendChild(svgEl("circle", {r:9}));
   const txt = svgEl("text", {"text-anchor":"middle", y:4.5});
   txt.textContent = "!";
@@ -1385,10 +1321,132 @@ function buildCycleMarker(node, h){
   return grp;
 }
 
-/* Vorschlagsliste für Trigger-Namen: alle Event-Namen, die irgendwo im Diagramm definiert sind. */
-function collectTriggerSuggestions(){
+/* ---------------- Offene Enden ----------------
+   Während des Entwerfens darf ein Diagramm unfertig sein. Statt Abhängigkeiten
+   ungefragt aufzuräumen, bleiben sie stehen und werden hier erkannt und markiert:
+   - Ziel verweist auf ein gelöschtes Element
+   - Ziel existiert, ist aber über keine Verbindung erreichbar
+   - Trigger kann nie auslösen (kein Event mit dem Namen, oder es wird nicht an
+     dieses Element gesendet) — ermittelt über denselben Event-Graphen wie die Zyklen
+   Die Simulation überspringt offene Ziele. */
+let currentOpenEnds = new Map();
+
+function deletedNodeName(id){
+  return (state.deletedNodes || {})[id] || id;
+}
+
+/* null = Ziel in Ordnung, sonst {kind:"deleted"|"unreachable", name} */
+function targetStatus(node, targetId){
+  const target = getNode(targetId);
+  if (!target) return {kind:"deleted", name:deletedNodeName(targetId)};
+  if (!findConnectionForTravel(node.id, targetId)) return {kind:"unreachable", name:target.name};
+  return null;
+}
+
+/* null = Trigger in Ordnung oder nicht relevant, sonst {kind:"noEvent"|"notSent"} */
+function triggerStatus(node, ev, graph){
+  if (node.type === "frontend" || !ev.trigger || ev.trigger === "__button__") return null;
+  for (const targets of graph.edges.values()){
+    for (const key of targets){
+      const st = graph.states.get(key);
+      if (st.node === node && st.ev === ev) return null;
+    }
+  }
+  const exists = state.nodes.some(n=>n !== node && (n.events||[]).some(e=>(e.name || "(Event)") === ev.trigger));
+  return {kind: exists ? "notSent" : "noEvent"};
+}
+
+function openEndText(item){
+  switch (item.kind){
+    case "deleted":     return "Ziel „" + item.name + "“ wurde gelöscht";
+    case "unreachable": return "keine Verbindung zu „" + item.name + "“";
+    case "noEvent":     return "Trigger „" + item.trigger + "“: kein Event mit diesem Namen";
+    case "notSent":     return "Trigger „" + item.trigger + "“: wird nicht an dieses Element gesendet";
+  }
+}
+
+/* Map nodeId → [{ev, kind, name?, trigger?}] — nur Elemente mit offenen Enden */
+function computeOpenEnds(graph){
+  const result = new Map();
+  state.nodes.forEach(node=>{
+    const items = [];
+    (node.events||[]).forEach(ev=>{
+      if (node.type !== "database"){
+        (ev.targetIds||[]).forEach(targetId=>{
+          const st = targetStatus(node, targetId);
+          if (st) items.push({ev, ...st});
+        });
+      }
+      const ts = triggerStatus(node, ev, graph);
+      if (ts) items.push({ev, ...ts, trigger:ev.trigger});
+    });
+    if (items.length) result.set(node.id, items);
+  });
+  return result;
+}
+
+const OPEN_ENDS_MAX = 10;
+
+function showOpenEndsTooltip(node, markerEl){
+  hideTooltip();
+  const items = currentOpenEnds.get(node.id) || [];
+  cycleTooltipEl.innerHTML = "";
+  const h = document.createElement("h5");
+  h.className = "open-ends";
+  h.textContent = "Offene Enden";
+  cycleTooltipEl.appendChild(h);
+  const ul = document.createElement("ul");
+  items.slice(0, OPEN_ENDS_MAX).forEach(item=>{
+    const li = document.createElement("li");
+    const evName = document.createElement("span");
+    evName.className = "ev-name";
+    evName.textContent = item.ev.name || "(Event)";
+    li.append(evName, ": " + openEndText(item));
+    ul.appendChild(li);
+  });
+  cycleTooltipEl.appendChild(ul);
+  if (items.length > OPEN_ENDS_MAX){
+    const more = document.createElement("div");
+    more.className = "more";
+    more.textContent = "… und " + (items.length - OPEN_ENDS_MAX) + " weitere";
+    cycleTooltipEl.appendChild(more);
+  }
+  const r = markerEl.getBoundingClientRect();
+  cycleTooltipEl.style.left = (r.left + r.width/2) + "px";
+  cycleTooltipEl.style.top = r.top + "px";
+  cycleTooltipEl.classList.add("show");
+}
+
+function buildOpenEndsMarker(node, h, dx){
+  const grp = svgEl("g", {class:"open-marker", "data-node":node.id, transform:`translate(${dx},${-h/2 - 16})`});
+  grp.appendChild(svgEl("circle", {r:9}));
+  const txt = svgEl("text", {"text-anchor":"middle", y:4.5});
+  txt.textContent = "?";
+  grp.appendChild(txt);
+  grp.addEventListener("mouseenter", ()=>{
+    if (dragCtx || connCtx || panning) return;
+    showOpenEndsTooltip(node, grp);
+  });
+  grp.addEventListener("mouseleave", hideCycleTooltip);
+  return grp;
+}
+
+/* Merkt sich nur Namen gelöschter Elemente, auf die noch ein Ziel verweist. */
+function pruneDeletedNodes(){
+  const referenced = new Set();
+  state.nodes.forEach(n=>(n.events||[]).forEach(ev=>(ev.targetIds||[]).forEach(id=>{ if (!getNode(id)) referenced.add(id); })));
+  const kept = {};
+  Object.entries(state.deletedNodes || {}).forEach(([id, name])=>{ if (referenced.has(id)) kept[id] = name; });
+  state.deletedNodes = kept;
+}
+
+/* Vorschlagsliste für Trigger-Namen: alle Event-Namen der anderen Elemente. Die Events des
+   Elements selbst fehlen bewusst — sie fliegen immer vom Element weg und kommen dort nie an,
+   ein Trigger darauf würde also nie auslösen. */
+function collectTriggerSuggestions(forNode){
   const names = new Set();
   state.nodes.forEach(n=>{
+    if (n === forNode) return;
     (n.events||[]).forEach(e=>{
       if (e.name && e.name.trim()) names.add(e.name.trim());
     });
@@ -1423,12 +1481,20 @@ function fireEvent(node, event, senderId){
     toast('Event "' + (event.name||"?") + '" hat keine Ziele ausgewählt.');
     return;
   }
+  const skipped = [];
   targetIds.forEach(targetId=>{
     const hop = findConnectionForTravel(node.id, targetId);
     const targetNode = getNode(targetId);
-    if (!hop || !targetNode) return;
+    if (!hop || !targetNode){
+      skipped.push(targetNode ? targetNode.name : deletedNodeName(targetId) + " (gelöscht)");
+      return;
+    }
     travelEvent(hop.conn, hop.reversed, event.name || "(Event)", targetNode, node.id);
   });
+  // Offene Enden werden übersprungen — aber nicht stillschweigend
+  if (skipped.length){
+    toast('Event „' + (event.name || "(Event)") + '“: nicht erreichbar und übersprungen: ' + skipped.join(", "), 3500);
+  }
 }
 
 /* Animiert den Event-Namen als fliegendes Label entlang der Verbindung (eigenes,
@@ -1522,23 +1588,13 @@ function renderEventsSection(node, content){
   content.appendChild(hint);
 }
 
-/* Benennt alle Trigger von oldName auf newName um. Tragen noch andere Events den alten
-   Namen, bleiben die Trigger unverändert — sie hören dann weiterhin auf diese Events.
-   Liefert die Elemente, deren Events geändert wurden. */
-function renameTriggers(renamedEv, oldName, newName){
-  if (!oldName || oldName === newName) return [];
+/* Trigger, die nach einer Umbenennung ins Leere zeigen: alle Trigger auf oldName — außer
+   ein anderes Event heißt noch so, dann hören sie weiterhin auf dieses. */
+function orphanedTriggers(renamedEv, oldName){
+  if (!oldName || renamedEv.name === oldName) return [];
   const stillUsed = state.nodes.some(n=>(n.events||[]).some(e=>e !== renamedEv && e.name === oldName));
-  const triggering = state.nodes.flatMap(n=>(n.events||[]).filter(e=>e.trigger === oldName).map(e=>({n, e})));
-  if (!triggering.length) return [];
-  if (stillUsed){
-    toast("Trigger auf „" + oldName + "“ wurden nicht umbenannt, da noch andere Events so heißen.", 4000);
-    return [];
-  }
-  triggering.forEach(({e})=>{ e.trigger = newName; });
-  toast(triggering.length === 1
-    ? "1 Trigger wurde auf „" + newName + "“ umbenannt."
-    : triggering.length + " Trigger wurden auf „" + newName + "“ umbenannt.");
-  return [...new Set(triggering.map(({n})=>n))];
+  if (stillUsed) return [];
+  return state.nodes.flatMap(n=>(n.events||[]).filter(e=>e.trigger === oldName).map(e=>({n, e})));
 }
 
 function buildEventRow(node, ev, onChange){
@@ -1549,10 +1605,11 @@ function buildEventRow(node, ev, onChange){
   nameInput.type = "text"; nameInput.className = "event-name-input";
   nameInput.value = ev.name; nameInput.placeholder = "Event-Name";
   nameInput.addEventListener("input", ()=>{ ev.name = nameInput.value; render(); });
-  // Erst beim Abschluss der Eingabe (Enter / Feld verlassen): Leerzeichen am Rand entfernen
-  // und Trigger, die auf den bisherigen Namen hören, mit umbenennen. Pro Tastendruck
-  // umzubenennen würde Trigger mit gleichnamigen Zwischenständen vermischen.
+  // Erst beim Abschluss der Eingabe (Enter / Feld verlassen): Leerzeichen am Rand entfernen.
+  // Trigger, die auf den bisherigen Namen hören, bleiben unverändert (offene Enden) — ein
+  // Hinweis bietet an, sie mit umzubenennen.
   let nameBeforeEdit = ev.name;
+  let orphanFrom = null; // ursprünglicher Name, auf den noch Trigger hören (auch über mehrere Umbenennungen)
   nameInput.addEventListener("focus", ()=>{ nameBeforeEdit = ev.name; });
   nameInput.addEventListener("change", ()=>{
     const newName = nameInput.value.trim();
@@ -1563,16 +1620,45 @@ function buildEventRow(node, ev, onChange){
       return;
     }
     ev.name = nameInput.value = newName;
-    const touchedNodes = renameTriggers(ev, nameBeforeEdit, newName);
+    if (!orphanFrom || !orphanedTriggers(ev, orphanFrom).length) orphanFrom = nameBeforeEdit;
     nameBeforeEdit = newName;
     render();
-    // Trigger-Auswahl der Event-Karten dieses Elements aktualisieren, falls betroffen
-    if (touchedNodes.includes(node)) onChange();
+    updateRenameHint();
   });
   nameInput.addEventListener("keydown", e=>{
     if (e.key === "Enter"){ e.preventDefault(); nameInput.blur(); }
   });
   card.appendChild(nameInput);
+
+  const renameHint = document.createElement("div");
+  renameHint.className = "rename-hint";
+  renameHint.style.display = "none";
+  card.appendChild(renameHint);
+  function updateRenameHint(){
+    const orphans = orphanedTriggers(ev, orphanFrom);
+    renameHint.innerHTML = "";
+    renameHint.style.display = orphans.length ? "" : "none";
+    if (!orphans.length) return;
+    const text = document.createElement("div");
+    text.textContent = (orphans.length === 1 ? "1 Trigger hört" : orphans.length + " Trigger hören")
+      + " noch auf „" + orphanFrom + "“.";
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "tbtn";
+    btn.textContent = "Trigger mit umbenennen";
+    btn.addEventListener("click", ()=>{
+      orphans.forEach(({e})=>{ e.trigger = ev.name; });
+      toast(orphans.length === 1
+        ? "1 Trigger wurde auf „" + ev.name + "“ umbenannt."
+        : orphans.length + " Trigger wurden auf „" + ev.name + "“ umbenannt.");
+      orphanFrom = null;
+      render();
+      // Trigger-Auswahl der Event-Karten dieses Elements aktualisieren, falls betroffen
+      if (orphans.some(({n})=>n === node)) onChange();
+      else updateRenameHint();
+    });
+    renameHint.append(text, btn);
+  }
 
   if (node.type === "frontend"){
     ev.trigger = "__button__";
@@ -1611,7 +1697,7 @@ function buildEventRow(node, ev, onChange){
         optBtn.value = "__button__"; optBtn.textContent = "Nur Button (manuell)";
         sel.appendChild(optBtn);
       }
-      const suggestions = collectTriggerSuggestions();
+      const suggestions = collectTriggerSuggestions(node);
       suggestions.forEach(name=>{
         const o = document.createElement("option");
         o.value = name; o.textContent = name;
@@ -1638,6 +1724,7 @@ function buildEventRow(node, ev, onChange){
         newWrap.style.display = "none";
         ev.trigger = sel.value;
         render();
+        updateTriggerWarning();
       }
     });
     function commitNewTrigger(){
@@ -1647,6 +1734,7 @@ function buildEventRow(node, ev, onChange){
         newWrap.style.display = "none";
         populateSelect();
         render();
+        updateTriggerWarning();
       } else {
         newWrap.style.display = "none";
         sel.value = ev.trigger && ev.trigger !== "__button__" ? ev.trigger : (isDb ? "" : "__button__");
@@ -1657,8 +1745,19 @@ function buildEventRow(node, ev, onChange){
     });
     newInput.addEventListener("blur", commitNewTrigger);
 
+    // Hinweis, wenn der Trigger nie auslösen kann (offenes Ende)
+    const trigWarn = document.createElement("div");
+    trigWarn.className = "hint warn-text"; trigWarn.style.marginTop = "6px";
+    function updateTriggerWarning(){
+      const ts = triggerStatus(node, ev, buildEventGraph());
+      trigWarn.textContent = ts ? "⚠ " + openEndText({...ts, trigger:ev.trigger}) : "";
+      trigWarn.style.display = ts ? "" : "none";
+    }
+    updateTriggerWarning();
+
     card.appendChild(sel);
     card.appendChild(newWrap);
+    card.appendChild(trigWarn);
   }
 
   if (node.type === "database"){
@@ -1673,14 +1772,18 @@ function buildEventRow(node, ev, onChange){
     card.appendChild(tgtLbl);
 
     const options = eventTargetOptions(node);
-    if (!options.length){
+    // Ziele, die nicht (mehr) erreichbar sind, bleiben als offene Enden auswählbar
+    const openTargets = (ev.targetIds||[])
+      .filter(id=>!options.some(o=>o.node.id===id))
+      .map(id=>({id, status: targetStatus(node, id)}))
+      .filter(o=>o.status);
+    if (!options.length && !openTargets.length){
       const none = document.createElement("div");
       none.className = "hint";
       none.textContent = "Keine verfügbaren Ziele vorhanden.";
       card.appendChild(none);
     } else {
-      ev.targetIds = (ev.targetIds||[]).filter(id=>options.some(o=>o.node.id===id));
-      card.appendChild(buildTargetDropdown(node, ev, options));
+      card.appendChild(buildTargetDropdown(node, ev, options, openTargets));
     }
   }
 
@@ -1708,7 +1811,7 @@ function buildEventRow(node, ev, onChange){
 /* Kompaktes Mehrfachauswahl-Dropdown für die Event-Ziele. Beim Hovern über einen
    Eintrag glühen das Zielelement und die zugehörige Verbindung im Diagramm auf,
    damit sofort erkennbar ist, welches Element gemeint ist. */
-function buildTargetDropdown(node, ev, options){
+function buildTargetDropdown(node, ev, options, openTargets){
   const wrap = document.createElement("div");
   wrap.className = "target-dropdown";
 
@@ -1723,10 +1826,14 @@ function buildTargetDropdown(node, ev, options){
   wrap.appendChild(panel);
 
   function updateButtonLabel(){
-    const chosen = options.filter(o => (ev.targetIds||[]).includes(o.node.id));
-    if (!chosen.length) btn.textContent = "Ziele wählen …";
-    else if (chosen.length === 1) btn.textContent = chosen[0].node.name;
-    else btn.textContent = chosen.length + " Ziele ausgewählt";
+    const ids = ev.targetIds || [];
+    const chosen = options.filter(o => ids.includes(o.node.id));
+    const chosenOpen = openTargets.filter(o => ids.includes(o.id));
+    const total = chosen.length + chosenOpen.length;
+    if (!total) btn.textContent = "Ziele wählen …";
+    else if (total === 1) btn.textContent = chosen.length ? chosen[0].node.name : "⚠ " + chosenOpen[0].status.name;
+    else btn.textContent = total + " Ziele ausgewählt" + (chosenOpen.length ? " (⚠ " + chosenOpen.length + " offen)" : "");
+    btn.classList.toggle("warn-text", chosenOpen.length > 0);
   }
   updateButtonLabel();
 
@@ -1780,6 +1887,36 @@ function buildTargetDropdown(node, ev, options){
     panel.appendChild(row);
   });
 
+  openTargets.forEach(({id, status})=>{
+    const row = document.createElement("label");
+    row.className = "target-dd-row open";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = (ev.targetIds||[]).includes(id);
+    cb.addEventListener("change", ()=>{
+      ev.targetIds = ev.targetIds || [];
+      if (cb.checked){
+        if (!ev.targetIds.includes(id)) ev.targetIds.push(id);
+      } else {
+        ev.targetIds = ev.targetIds.filter(t=>t!==id);
+      }
+      updateButtonLabel();
+      render();
+      if (status.kind === "unreachable") setNodeGlow(id, true);
+    });
+    row.appendChild(cb);
+    const span = document.createElement("span");
+    span.textContent = status.kind === "deleted"
+      ? "⚠ gelöscht: " + status.name
+      : "⚠ " + status.name + " (keine Verbindung)";
+    row.appendChild(span);
+    if (status.kind === "unreachable"){
+      row.addEventListener("mouseenter", ()=>setNodeGlow(id, true));
+      row.addEventListener("mouseleave", ()=>setNodeGlow(id, false));
+    }
+    panel.appendChild(row);
+  });
+
   return wrap;
 }
 
@@ -1811,13 +1948,14 @@ document.getElementById("btn-add-db").addEventListener("click", ()=>addNode("dat
 document.getElementById("btn-clear").addEventListener("click", ()=>{
   showConfirm("Wirklich das gesamte Diagramm löschen?", ()=>{
     stopSimulation();
-    state = {nodes:[], connections:[]};
+    state = {nodes:[], connections:[], deletedNodes:{}};
     deselectAll();
   });
 });
 
 document.getElementById("btn-export").addEventListener("click", ()=>{
-  const data = JSON.stringify({nodes:state.nodes, connections:state.connections}, null, 2);
+  pruneDeletedNodes();
+  const data = JSON.stringify({nodes:state.nodes, connections:state.connections, deletedNodes:state.deletedNodes}, null, 2);
   const blob = new Blob([data], {type:"application/json"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -1888,11 +2026,18 @@ function validateImport(data){
       if (ev.targetIds !== undefined){
         if (!Array.isArray(ev.targetIds)) errors.push(where + ": „targetIds“ ist keine Liste.");
         else ev.targetIds.forEach(t=>{
-          if (!nodeIds.has(t)) errors.push(where + ": Ziel „" + t + "“ existiert nicht.");
+          // Ziele auf nicht (mehr) vorhandene Elemente sind erlaubt — sie gelten als offene Enden.
+          if (!isNonEmptyStr(t)) errors.push(where + ": Ziel-IDs müssen Text sein.");
         });
       }
     });
   });
+
+  if (data.deletedNodes !== undefined){
+    if (!isObj(data.deletedNodes) || Object.values(data.deletedNodes).some(v=>typeof v !== "string")){
+      errors.push("„deletedNodes“ muss ein Objekt aus ID → Name (Text) sein.");
+    }
+  }
 
   const connIds = new Set();
   const connKeys = new Set();
@@ -1940,7 +2085,8 @@ function normalizeImport(data){
       ...c,
       description: c.description || "",
       websocket: !!c.websocket
-    }))
+    })),
+    deletedNodes: {...(data.deletedNodes || {})}
   };
 }
 
@@ -1970,6 +2116,7 @@ document.getElementById("file-import").addEventListener("change", e=>{
     stopSimulation();
     state = normalizeImport(data);
     deselectAll();
+    commitHistory(); // Datei wird asynchron gelesen — von der automatischen Erfassung nicht abgedeckt
     toast("Diagramm importiert.");
   };
   reader.readAsText(file);
@@ -1992,7 +2139,94 @@ window.addEventListener("keydown", e=>{
 
 window.addEventListener("resize", ()=>{ /* keep current view */ });
 
+/* ============================================================
+   UNDO / REDO
+   ============================================================
+   Der gesamte Diagramm-Zustand wird als JSON-Schnappschuss gespeichert. Statt jede
+   Änderungsstelle einzeln anzufassen, wird nach jeder abgeschlossenen Benutzeraktion
+   (Klick, Loslassen der Maus, abgeschlossene Eingabe, Taste außerhalb von Textfeldern)
+   geprüft, ob sich der Zustand geändert hat — wenn ja, entsteht ein Rückgängig-Schritt.
+   Tippen in Textfeldern ergibt dadurch einen Schritt pro Eingabe (beim Verlassen des Felds),
+   Ziehen eines Elements einen Schritt pro Ziehvorgang. */
+const HISTORY_MAX = 200;
+const history = {undo:[], redo:[], current:null};
+let historyCommitPending = false;
+
+function commitHistory(){
+  const snap = JSON.stringify(state);
+  if (snap === history.current) return;
+  if (history.current !== null){
+    history.undo.push(history.current);
+    if (history.undo.length > HISTORY_MAX) history.undo.shift();
+    history.redo = [];
+  }
+  history.current = snap;
+  updateUndoButtons();
+}
+
+/* Erst nach allen Handlern der laufenden Benutzeraktion prüfen. */
+function scheduleHistoryCommit(){
+  if (historyCommitPending) return;
+  historyCommitPending = true;
+  setTimeout(()=>{ historyCommitPending = false; commitHistory(); }, 0);
+}
+
+function restoreHistory(snap){
+  const selNode = selectedNodeId, selConn = selectedConnId;
+  stopSimulation();
+  hideTooltip();
+  hideCycleTooltip();
+  closeOpenTargetDropdown();
+  state = JSON.parse(snap);
+  history.current = snap;
+  // Auswahl beibehalten, wenn das Element bzw. die Verbindung noch existiert
+  if (selNode && getNode(selNode)) selectNode(selNode);
+  else if (selConn && state.connections.some(c=>c.id===selConn)) selectConnection(selConn);
+  else deselectAll();
+  updateUndoButtons();
+}
+
+function undo(){
+  commitHistory(); // noch nicht erfasste Änderungen (z. B. laufende Texteingabe) zuerst sichern
+  if (!history.undo.length) return;
+  history.redo.push(history.current);
+  restoreHistory(history.undo.pop());
+}
+
+function redo(){
+  commitHistory();
+  if (!history.redo.length) return;
+  history.undo.push(history.current);
+  restoreHistory(history.redo.pop());
+}
+
+function updateUndoButtons(){
+  document.getElementById("btn-undo").disabled = !history.undo.length;
+  document.getElementById("btn-redo").disabled = !history.redo.length;
+}
+
+function isTextField(el){
+  return el && (el.tagName === "TEXTAREA" || (el.tagName === "INPUT" && el.type === "text"));
+}
+
+["click", "change", "mouseup"].forEach(type=>window.addEventListener(type, scheduleHistoryCommit, true));
+window.addEventListener("keydown", e=>{
+  // In Textfeldern gilt das Rückgängig des Browsers; Tippen wird erst bei "change" erfasst.
+  if (isTextField(document.activeElement)) return;
+  scheduleHistoryCommit();
+  if (confirmOverlay.classList.contains("show") || errorOverlay.classList.contains("show")) return;
+  const mod = e.ctrlKey || e.metaKey;
+  if (!mod) return;
+  const key = e.key.toLowerCase();
+  if (key === "z" && !e.shiftKey){ e.preventDefault(); undo(); }
+  else if (key === "y" || (key === "z" && e.shiftKey)){ e.preventDefault(); redo(); }
+}, true);
+
+document.getElementById("btn-undo").addEventListener("click", undo);
+document.getElementById("btn-redo").addEventListener("click", redo);
+
 render();
+commitHistory();
 })();
 </script>
 </body>

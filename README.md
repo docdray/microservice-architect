@@ -20,7 +20,7 @@ Das gesamte Tool steckt in einer einzigen Datei – `microservice-architect.html
 
 Elemente werden über die Toolbar (`+ Service`, `+ Frontend`, `+ Datenbank`) angelegt und per Drag & Drop verschoben. Ein Klick öffnet die Seitenleiste zum Bearbeiten von Name und Beschreibung; die Beschreibung erscheint als Tooltip beim Überfahren mit der Maus.
 
-Ist ein Element Ziel von Events anderer Elemente, erscheint beim Löschen eine Rückfrage mit der Liste dieser Events. Bei **OK** werden Element und Verbindungen gelöscht; Events, die danach noch ein anderes erreichbares Ziel haben, verlieren nur dieses Ziel, alle anderen werden gelöscht.
+Beim Löschen eines Elements werden auch seine Verbindungen gelöscht. Events anderer Elemente, die das Element als Ziel hatten, bleiben unverändert – das Ziel wird als offenes Ende „gelöscht: Name“ markiert (siehe [Offene Enden](#offene-enden)).
 
 ### Verbindungen
 
@@ -36,13 +36,13 @@ Zwischen zwei Elementen gibt es pro Richtung höchstens eine Verbindung desselbe
 
 Jede Verbindung kann eine Beschreibung erhalten (z. B. `GET /orders`).
 
-Wird eine Verbindung gelöscht, über die Events ihr Ziel erreichen, erscheint vorher eine Rückfrage mit der Liste dieser Events. Bei **OK** wird die Verbindung gelöscht; Events, die danach noch ein anderes erreichbares Ziel haben, verlieren nur das betroffene Ziel, alle anderen werden gelöscht. Bei **Abbrechen** bleibt alles unverändert. Events, die ihr Ziel noch auf einem anderen Weg erreichen (z. B. als Antwort über eine REST-Verbindung), sind nicht betroffen.
+Beim Löschen einer Verbindung bleiben Events, die darüber ihr Ziel erreicht haben, unverändert – das Ziel wird als offenes Ende „keine Verbindung“ markiert, bis wieder ein Weg dorthin existiert.
 
 ### Event-Simulation
 
 Jedes Element kann in der Seitenleiste unter **Events (Simulator)** beliebig viele Events definieren:
 
-- **Name** – wird bei der Simulation als animiertes Label entlang der Verbindung angezeigt. Leerzeichen am Rand werden entfernt, ein leerer Name ist nicht erlaubt. Beim Umbenennen werden alle Trigger, die auf den bisherigen Namen hören, automatisch mit umbenannt – außer es tragen noch andere Events diesen Namen.
+- **Name** – wird bei der Simulation als animiertes Label entlang der Verbindung angezeigt. Leerzeichen am Rand werden entfernt, ein leerer Name ist nicht erlaubt. Beim Umbenennen bleiben Trigger, die auf den bisherigen Namen hören, unverändert (offenes Ende); ein Hinweis in der Event-Karte bietet an, sie per **Trigger mit umbenennen** nachzuziehen. Tragen noch andere Events den alten Namen, hören die Trigger weiterhin auf diese, und es erscheint kein Hinweis.
 - **Trigger** – entweder *Nur Button (manuell)* oder der Name eines anderen Events. Kommt ein Event mit diesem Namen am Element an, wird das eigene Event automatisch ausgelöst.
 - **Ziele** – Elemente, an die das Event geschickt wird. Zur Auswahl stehen alle Ziele abgehender Verbindungen sowie Absender eingehender REST-Verbindungen (Antwort auf eine Anfrage).
 
@@ -59,6 +59,20 @@ Zyklen in den Event-Ketten werden unabhängig von der Simulation laufend erkannt
 - erscheint die Meldung **„Zyklus erkannt“** mit dem Ablauf als Liste `Element: Event → Empfänger`, beginnend beim Event des überfahrenen Elements (maximal 10 Einträge),
 - leuchten die Warnkreise aller Elemente desselben Zyklus auf.
 
+### Offene Enden
+
+Beim Entwerfen darf ein Diagramm unfertig sein. Abhängigkeiten werden nicht ungefragt aufgeräumt, sondern bleiben stehen und werden mit einem orangefarbenen **?** über dem Element markiert. Beim Überfahren listet der Marker die offenen Enden auf:
+
+- **Ziel gelöscht** – ein Event-Ziel verweist auf ein Element, das es nicht mehr gibt (der alte Name bleibt sichtbar),
+- **keine Verbindung** – das Ziel existiert, ist aber über keine Verbindung erreichbar,
+- **Trigger löst nie aus** – es gibt kein Event mit diesem Namen, oder es wird nicht an dieses Element gesendet.
+
+In der Seitenleiste stehen offene Ziele mit ⚠ im Ziel-Dropdown und lassen sich dort abhaken; unter einem Trigger, der nie auslösen kann, erscheint ein Hinweis. Die Simulation überspringt offene Ziele und meldet das kurz. Sobald ein offenes Ende behoben ist (z. B. Verbindung gezogen), verschwindet die Markierung.
+
+### Rückgängig & Wiederholen
+
+Jede Änderung am Diagramm lässt sich mit **↶ Rückgängig** (Strg+Z) zurücknehmen und mit **↷ Wiederholen** (Strg+Y oder Strg+Umschalt+Z) wiederherstellen – bis zu 200 Schritte. Eine Texteingabe zählt als ein Schritt (abgeschlossen beim Verlassen des Felds), ebenso ein Ziehvorgang. Solange ein Textfeld aktiv ist, wirkt Strg+Z wie gewohnt nur auf den Text im Feld. Auswahl, Zoom und Ansicht gehören nicht zum Verlauf.
+
 ### Ansicht & Bedienung
 
 - **Zoom:** Mausrad (15 % – 300 %)
@@ -72,7 +86,9 @@ Zyklen in den Event-Ketten werden unabhängig von der Simulation laufend erkannt
 Das Diagramm wird **nicht automatisch gespeichert** – nach einem Neuladen der Seite ist es verloren.
 
 - **⭳ Export JSON** lädt das Diagramm als `microservice-architektur.json` herunter.
-- **⭱ Import JSON** lädt eine zuvor exportierte Datei. Die Datei wird vorher vollständig geprüft (gültiges JSON, bekannte Typen, eindeutige IDs, Positionen, existierende Verbindungs- und Event-Ziele, Verbindungsregeln). Bei Fehlern erscheint ein Dialog mit allen gefundenen Problemen, und das aktuelle Diagramm bleibt unverändert.
+- **⭱ Import JSON** lädt eine zuvor exportierte Datei. Die Datei wird vorher vollständig geprüft (gültiges JSON, bekannte Typen, eindeutige IDs, Positionen, existierende Start- und Zielelemente von Verbindungen, Verbindungsregeln). Bei Fehlern erscheint ein Dialog mit allen gefundenen Problemen, und das aktuelle Diagramm bleibt unverändert.
+
+Event-Ziele dürfen beim Import auf nicht vorhandene Elemente verweisen – sie werden als offene Enden übernommen. Die Namen gelöschter Elemente stehen im optionalen Feld `deletedNodes` (ID → Name).
 
 Format:
 
