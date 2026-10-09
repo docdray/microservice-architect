@@ -14,7 +14,7 @@ Das gesamte Tool steckt in einer einzigen Datei – `microservice-architect.html
 
 | Typ | Beschreibung |
 | --- | --- |
-| **Service** | Backend-Service; kann optional eine REST-Schnittstelle anbieten (REST-Badge). |
+| **Service** | Backend-Service; kann optional eine REST-Schnittstelle anbieten (REST-Badge). Solange REST-Verbindungen zum Service bestehen, lässt sich die Schnittstelle nicht abschalten. |
 | **Frontend** | Client-Anwendung; bietet selbst keine REST-Schnittstelle an und hat keine Event-Verbindungen. |
 | **Datenbank** | Datenspeicher; kann nur antworten, nicht selbst Anfragen stellen. |
 
@@ -26,7 +26,7 @@ Verbindungen entstehen durch Ziehen an den kleinen Anfassern eines Elements (**R
 
 | Typ | Darstellung | Regeln |
 | --- | --- | --- |
-| **REST** | durchgezogener Pfeil | Optional als **WebSocket** markierbar (Sonderfall von REST, gestrichelt). |
+| **REST** | durchgezogener Pfeil | Nur zu Services mit REST-Schnittstelle, nie zu einem Frontend. Optional als **WebSocket** markierbar (Sonderfall von REST, gestrichelt). |
 | **Event** | durchgezogener Pfeil | Nicht zu Datenbanken, nicht von/zu Frontends. |
 | **Datenbank** | gestrichelt | Entsteht automatisch, wenn eine REST-Verbindung auf eine Datenbank gezogen wird. |
 
@@ -68,7 +68,7 @@ Zyklen in den Event-Ketten werden unabhängig von der Simulation laufend erkannt
 Das Diagramm wird **nicht automatisch gespeichert** – nach einem Neuladen der Seite ist es verloren.
 
 - **⭳ Export JSON** lädt das Diagramm als `microservice-architektur.json` herunter.
-- **⭱ Import JSON** lädt eine zuvor exportierte Datei. Die Datei wird vorher vollständig geprüft (gültiges JSON, bekannte Typen, eindeutige IDs, Positionen, existierende Verbindungs- und Event-Ziele). Bei Fehlern erscheint ein Dialog mit allen gefundenen Problemen, und das aktuelle Diagramm bleibt unverändert.
+- **⭱ Import JSON** lädt eine zuvor exportierte Datei. Die Datei wird vorher vollständig geprüft (gültiges JSON, bekannte Typen, eindeutige IDs, Positionen, existierende Verbindungs- und Event-Ziele, Verbindungsregeln). Bei Fehlern erscheint ein Dialog mit allen gefundenen Problemen, und das aktuelle Diagramm bleibt unverändert.
 
 Format:
 

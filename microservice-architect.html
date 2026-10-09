@@ -891,18 +891,35 @@ function findNodeAt(x,y){
   return null;
 }
 
+/* Verbindungsregeln — gelten beim Ziehen neuer Verbindungen und beim Import.
+   Liefert eine Fehlermeldung oder null, wenn die Verbindung erlaubt ist. */
+function connectionRuleError(source, target, type){
+  if (source.type === "database") return "Datenbanken können keine Verbindung aufbauen.";
+  if (type === "rest"){
+    if (target.type === "frontend") return "REST-Verbindungen zu einem Frontend sind nicht möglich — ein Frontend bietet keine REST-Schnittstelle an.";
+    if (target.type === "database") return "Verbindungen zu einer Datenbank müssen vom Typ „db“ sein.";
+    if (!target.offersRest) return "„" + target.name + "“ bietet keine REST-Schnittstelle an. Sie lässt sich in der Seitenleiste des Service aktivieren.";
+  }
+  if (type === "event"){
+    if (source.type === "frontend" || target.type === "frontend") return "Event-Verbindungen mit einem Frontend sind nicht vorgesehen.";
+    if (target.type === "database") return "Event-Verbindungen zu Datenbanken sind nicht vorgesehen.";
+  }
+  if (type === "db" && target.type !== "database") return "Datenbank-Verbindungen müssen zu einer Datenbank führen.";
+  return null;
+}
+
+/* Hat der Service eingehende REST-Verbindungen (inkl. WebSocket)? Dann muss er
+   seine REST-Schnittstelle behalten. */
+function hasIncomingRest(node){
+  return state.connections.some(c=>c.to === node.id && c.type === "rest");
+}
+
 function createConnection(source, target, connType){
-  let type = connType;
   // REST-Handle auf eine Datenbank gezogen => DB-Verbindung
-  if (connType === "rest" && target.type === "database"){
-    type = "db";
-  }
-  if (connType === "event" && target.type === "database"){
-    toast("Event-Verbindungen zu Datenbanken sind nicht vorgesehen.");
-    return;
-  }
-  if (connType === "event" && (source.type === "frontend" || target.type === "frontend")){
-    toast("Event-Verbindungen mit einem Frontend sind nicht vorgesehen.");
+  const type = connType === "rest" && target.type === "database" ? "db" : connType;
+  const error = connectionRuleError(source, target, type);
+  if (error){
+    toast(error, 4000);
     return;
   }
   const conn = {id:uid("c"), type, from:source.id, to:target.id, description:"", websocket:false};
@@ -966,18 +983,22 @@ function showNodeSidebar(node){
   if (node.type === "service"){
     const line = document.createElement("div"); line.className="checkline";
     const cb = document.createElement("input"); cb.type="checkbox"; cb.checked = !!node.offersRest; cb.id="cb-rest";
+    const restLocked = !!node.offersRest && hasIncomingRest(node);
+    cb.disabled = restLocked;
     cb.addEventListener("change", ()=>{ node.offersRest = cb.checked; render(); });
     const lb = document.createElement("label"); lb.setAttribute("for","cb-rest"); lb.style.margin="0"; lb.style.textTransform="none";
     lb.textContent = "Bietet REST-Schnittstelle an";
     line.appendChild(cb); line.appendChild(lb);
     content.appendChild(line);
     const hint = document.createElement("div"); hint.className="hint";
-    hint.textContent = "Wird als REST-Badge am Element angezeigt.";
+    hint.textContent = restLocked
+      ? "Wird als REST-Badge am Element angezeigt. Lässt sich erst abschalten, wenn keine REST-Verbindungen zu diesem Service mehr bestehen."
+      : "Wird als REST-Badge am Element angezeigt. Nur Services mit REST-Schnittstelle können REST-Verbindungen annehmen.";
     content.appendChild(hint);
   } else if (node.type === "frontend"){
     const hint = document.createElement("div"); hint.className="hint";
     hint.style.marginTop="10px";
-    hint.textContent = "Ein Frontend bietet selbst keine REST-Schnittstelle an und kann keine Event-Verbindung haben — es kann aber REST-Verbindungen zu Services aufbauen.";
+    hint.textContent = "Ein Frontend bietet selbst keine REST-Schnittstelle an und kann keine Event-Verbindung haben — es kann aber REST-Verbindungen zu Services mit REST-Schnittstelle aufbauen.";
     content.appendChild(hint);
   }
 
@@ -1766,6 +1787,7 @@ function validateImport(data){
   if (errors.length) return errors;
 
   const nodeIds = new Set();
+  const nodesById = new Map();
   const eventIds = new Set();
   const nodeTypes = Object.keys(TYPE_META);
   data.nodes.forEach((n, i)=>{
@@ -1775,7 +1797,7 @@ function validateImport(data){
 
     if (!isNonEmptyStr(n.id)) errors.push(where + ": „id“ fehlt oder ist leer.");
     else if (nodeIds.has(n.id)) errors.push(where + ": ID „" + n.id + "“ ist mehrfach vergeben.");
-    else nodeIds.add(n.id);
+    else { nodeIds.add(n.id); nodesById.set(n.id, n); }
 
     if (!nodeTypes.includes(n.type)){
       errors.push(where + ": unbekannter Typ „" + n.type + "“ (erlaubt: " + nodeTypes.join(", ") + ").");
@@ -1825,6 +1847,14 @@ function validateImport(data){
     if (!nodeIds.has(c.from)) errors.push(where + ": Start-Element „" + c.from + "“ existiert nicht.");
     if (!nodeIds.has(c.to)) errors.push(where + ": Ziel-Element „" + c.to + "“ existiert nicht.");
     if (c.from !== undefined && c.from === c.to) errors.push(where + ": verbindet ein Element mit sich selbst.");
+    else if (nodesById.has(c.from) && nodesById.has(c.to) && connTypes.includes(c.type)){
+      const from = nodesById.get(c.from), to = nodesById.get(c.to);
+      // Regeln nur prüfen, wenn beide Elemente einen gültigen Typ haben (sonst gibt es schon einen Fehler)
+      if (nodeTypes.includes(from.type) && nodeTypes.includes(to.type)){
+        const ruleError = connectionRuleError(from, to, c.type);
+        if (ruleError) errors.push(where + ": " + ruleError);
+      }
+    }
     optType(c, "description", "string", where);
     optType(c, "websocket", "boolean", where);
   });
