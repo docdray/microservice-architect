@@ -42,7 +42,7 @@ Wird eine Verbindung gelöscht, über die Events ihr Ziel erreichen, erscheint v
 
 Jedes Element kann in der Seitenleiste unter **Events (Simulator)** beliebig viele Events definieren:
 
-- **Name** – wird bei der Simulation als animiertes Label entlang der Verbindung angezeigt.
+- **Name** – wird bei der Simulation als animiertes Label entlang der Verbindung angezeigt. Leerzeichen am Rand werden entfernt, ein leerer Name ist nicht erlaubt. Beim Umbenennen werden alle Trigger, die auf den bisherigen Namen hören, automatisch mit umbenannt – außer es tragen noch andere Events diesen Namen.
 - **Trigger** – entweder *Nur Button (manuell)* oder der Name eines anderen Events. Kommt ein Event mit diesem Namen am Element an, wird das eigene Event automatisch ausgelöst.
 - **Ziele** – Elemente, an die das Event geschickt wird. Zur Auswahl stehen alle Ziele abgehender Verbindungen sowie Absender eingehender REST-Verbindungen (Antwort auf eine Anfrage).
 

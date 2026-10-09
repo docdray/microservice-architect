@@ -1522,6 +1522,25 @@ function renderEventsSection(node, content){
   content.appendChild(hint);
 }
 
+/* Benennt alle Trigger von oldName auf newName um. Tragen noch andere Events den alten
+   Namen, bleiben die Trigger unverändert — sie hören dann weiterhin auf diese Events.
+   Liefert die Elemente, deren Events geändert wurden. */
+function renameTriggers(renamedEv, oldName, newName){
+  if (!oldName || oldName === newName) return [];
+  const stillUsed = state.nodes.some(n=>(n.events||[]).some(e=>e !== renamedEv && e.name === oldName));
+  const triggering = state.nodes.flatMap(n=>(n.events||[]).filter(e=>e.trigger === oldName).map(e=>({n, e})));
+  if (!triggering.length) return [];
+  if (stillUsed){
+    toast("Trigger auf „" + oldName + "“ wurden nicht umbenannt, da noch andere Events so heißen.", 4000);
+    return [];
+  }
+  triggering.forEach(({e})=>{ e.trigger = newName; });
+  toast(triggering.length === 1
+    ? "1 Trigger wurde auf „" + newName + "“ umbenannt."
+    : triggering.length + " Trigger wurden auf „" + newName + "“ umbenannt.");
+  return [...new Set(triggering.map(({n})=>n))];
+}
+
 function buildEventRow(node, ev, onChange){
   const card = document.createElement("div");
   card.className = "event-card";
@@ -1530,6 +1549,29 @@ function buildEventRow(node, ev, onChange){
   nameInput.type = "text"; nameInput.className = "event-name-input";
   nameInput.value = ev.name; nameInput.placeholder = "Event-Name";
   nameInput.addEventListener("input", ()=>{ ev.name = nameInput.value; render(); });
+  // Erst beim Abschluss der Eingabe (Enter / Feld verlassen): Leerzeichen am Rand entfernen
+  // und Trigger, die auf den bisherigen Namen hören, mit umbenennen. Pro Tastendruck
+  // umzubenennen würde Trigger mit gleichnamigen Zwischenständen vermischen.
+  let nameBeforeEdit = ev.name;
+  nameInput.addEventListener("focus", ()=>{ nameBeforeEdit = ev.name; });
+  nameInput.addEventListener("change", ()=>{
+    const newName = nameInput.value.trim();
+    if (!newName){
+      ev.name = nameInput.value = nameBeforeEdit;
+      toast("Der Event-Name darf nicht leer sein.");
+      render();
+      return;
+    }
+    ev.name = nameInput.value = newName;
+    const touchedNodes = renameTriggers(ev, nameBeforeEdit, newName);
+    nameBeforeEdit = newName;
+    render();
+    // Trigger-Auswahl der Event-Karten dieses Elements aktualisieren, falls betroffen
+    if (touchedNodes.includes(node)) onChange();
+  });
+  nameInput.addEventListener("keydown", e=>{
+    if (e.key === "Enter"){ e.preventDefault(); nameInput.blur(); }
+  });
   card.appendChild(nameInput);
 
   if (node.type === "frontend"){
@@ -1892,7 +1934,7 @@ function normalizeImport(data){
       ...n,
       description: n.description || "",
       offersRest: n.type === "service" && !!n.offersRest,
-      events: (n.events || []).map(ev=>({...ev, targetIds: ev.targetIds || []}))
+      events: (n.events || []).map(ev=>({...ev, name: ev.name.trim(), trigger: ev.trigger.trim(), targetIds: ev.targetIds || []}))
     })),
     connections: data.connections.map(c=>({
       ...c,
