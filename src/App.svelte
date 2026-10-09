@@ -28,10 +28,14 @@
       if (key === "z" && !e.shiftKey) { e.preventDefault(); ed.undo(); }
       else if (key === "y" || (key === "z" && e.shiftKey)) { e.preventDefault(); ed.redo(); }
     };
+    /* Entf/Backspace löscht die Auswahl — außer die Taste gilt einem Bedienelement:
+       Eingabefelder, Auswahllisten, alles in der Seitenleiste, oder ein offener Dialog. */
     const onKey = (e: KeyboardEvent) => {
-      if (ed.confirm) return;
-      const tag = document.activeElement?.tagName;
-      if ((e.key === "Delete" || e.key === "Backspace") && tag !== "INPUT" && tag !== "TEXTAREA") ed.deleteSelected();
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      if (ed.confirm || ed.errors) return;
+      const active = document.activeElement;
+      if (active && (["INPUT", "TEXTAREA", "SELECT"].includes(active.tagName) || active.closest("#sidebar"))) return;
+      ed.deleteSelected();
     };
     const captureTypes = ["click", "change", "mouseup"] as const;
     captureTypes.forEach(t => window.addEventListener(t, schedule, true));

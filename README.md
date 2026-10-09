@@ -87,7 +87,7 @@ Die Symbol-Buttons der Toolbar zeigen ihre Bedeutung als Tooltip beim Überfahre
 - **Zoom:** Mausrad (15 % – 300 %)
 - **Verschieben:** Ziehen auf freier Fläche
 - **⤢ Ansicht zurücksetzen:** Zoom und Position zurücksetzen
-- **Entf / Backspace:** ausgewähltes Element bzw. Verbindung löschen
+- **Entf / Backspace:** ausgewähltes Element bzw. Verbindung löschen (nicht, solange ein Feld oder Bedienelement der Seitenleiste den Fokus hat oder ein Dialog offen ist)
 - **🗑 Alles löschen:** leert das gesamte Diagramm (mit Rückfrage)
 
 ### Speichern & Laden
