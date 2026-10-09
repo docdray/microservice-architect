@@ -4,6 +4,7 @@
   --bg:#05070a;
   --grid:#10151c;
   --panel:#0c1117;
+  --panel-glass:rgba(12,17,23,.8); /* schwebende Bedienfelder, 20 % transparent */
   --panel-border:#1c2530;
   --text:#dbe4ee;
   --text-dim:#7c8899;
@@ -36,10 +37,13 @@ svg#canvas.panning{cursor:grabbing;}
 #toolbar{
   position:absolute;top:14px;left:14px;
   display:flex;gap:8px;align-items:center;
-  background:var(--panel);border:1px solid var(--panel-border);
+  background:var(--panel-glass);border:1px solid var(--panel-border);
   padding:8px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.5);
   z-index:10;flex-wrap:wrap;max-width:calc(100vw - 320px);
 }
+/* Schwebende Bedienfelder: leicht transparent, Hintergrund unscharf, damit darunterliegende
+   Elemente erkennbar bleiben, aber den Text nicht stören */
+#toolbar, #sidebar, #legend, #zoomlabel{-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);}
 #toolbar .grp{display:flex;gap:6px;padding:0 6px;border-right:1px solid var(--panel-border);}
 #toolbar .grp:last-child{border-right:none;}
 button.tbtn{
@@ -57,7 +61,7 @@ button.tbtn:disabled{opacity:.4;cursor:default;background:#121923;border-color:v
 /* ---------- Sidebar ---------- */
 #sidebar{
   position:absolute;top:14px;right:14px;width:280px;
-  background:var(--panel);border:1px solid var(--panel-border);
+  background:var(--panel-glass);border:1px solid var(--panel-border);
   border-radius:10px;padding:16px;box-shadow:0 6px 24px rgba(0,0,0,.5);
   z-index:10;display:none;max-height:calc(100vh - 28px);overflow:auto;
 }
@@ -132,7 +136,7 @@ button.tbtn:disabled{opacity:.4;cursor:default;background:#121923;border-color:v
 
 /* ---------- Legend ---------- */
 #legend{
-  position:absolute;bottom:14px;left:14px;background:var(--panel);border:1px solid var(--panel-border);
+  position:absolute;bottom:14px;left:14px;background:var(--panel-glass);border:1px solid var(--panel-border);
   border-radius:10px;padding:10px 14px;font-size:11.5px;color:var(--text-dim);z-index:10;
   display:flex;flex-direction:column;gap:5px;box-shadow:0 6px 24px rgba(0,0,0,.5);
 }
@@ -142,7 +146,7 @@ button.tbtn:disabled{opacity:.4;cursor:default;background:#121923;border-color:v
 
 /* ---------- Node hint / handle tooltip ---------- */
 #zoomlabel{
-  position:absolute;bottom:14px;right:14px;background:var(--panel);border:1px solid var(--panel-border);
+  position:absolute;bottom:14px;right:14px;background:var(--panel-glass);border:1px solid var(--panel-border);
   border-radius:8px;padding:6px 10px;font-size:11.5px;color:var(--text-dim);z-index:10;
 }
 
