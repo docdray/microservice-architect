@@ -4,13 +4,10 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 /* Die Tests stützen sich ausschließlich auf stabile Selektoren (IDs, Klassen,
-   data-Attribute) und den JSON-Export. Alte Einzeldatei und Svelte-Version müssen
-   diese Selektoren gleichermaßen bereitstellen. */
+   data-Attribute) und den JSON-Export — nicht auf interne Strukturen der Komponenten. */
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-export const APP_URL = "file://" + (process.env.APP === "legacy"
-  ? path.join(root, "legacy/microservice-architect.html")
-  : path.join(root, "dist/index.html"));
+export const APP_URL = "file://" + path.join(root, "dist/index.html");
 
 export type Diagram = {
   nodes: Array<{
