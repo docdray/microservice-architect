@@ -10,8 +10,7 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "npm run build && playwright test",
-    "test:e2e:legacy": "APP=legacy playwright test"
+    "test:e2e": "npm run build && playwright test"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",

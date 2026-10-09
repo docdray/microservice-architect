@@ -127,7 +127,6 @@ Format:
 | `npm run check` | Typprüfung (TypeScript + Svelte) |
 | `npm test` | Unit-Tests der Fachlogik (Vitest) |
 | `npm run test:e2e` | Bauen und Ende-zu-Ende-Tests im Browser (Playwright) |
-| `npm run test:e2e:legacy` | Dieselben E2E-Tests gegen die alte Einzeldatei in `legacy/` |
 
 Für die E2E-Tests wird Chromium benötigt: einmalig `npx playwright install chromium`, oder einen vorhandenen Chromium über die Umgebungsvariable `CHROMIUM_PATH` angeben.
 
@@ -152,7 +151,6 @@ src/
 tests/
   unit/             Unit-Tests der Fachlogik
   e2e/              Browser-Tests; stützen sich nur auf stabile IDs/Klassen und den JSON-Export
-legacy/             Ursprüngliche Einzeldatei (Referenz während der Portierung)
 ```
 
 Die Fachlogik kennt keinen globalen Zustand und lässt sich ohne Browser testen. Die Oberfläche leitet Zyklen und offene Enden reaktiv aus dem Diagramm ab (`$derived`) – es gibt kein manuelles Neuzeichnen.
