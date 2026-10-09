@@ -38,7 +38,7 @@ svg#canvas.panning{cursor:grabbing;}
   display:flex;gap:8px;align-items:center;
   background:var(--panel);border:1px solid var(--panel-border);
   padding:8px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.5);
-  z-index:10;flex-wrap:wrap;max-width:min(760px,calc(100vw - 320px));
+  z-index:10;flex-wrap:wrap;max-width:calc(100vw - 320px);
 }
 #toolbar .grp{display:flex;gap:6px;padding:0 6px;border-right:1px solid var(--panel-border);}
 #toolbar .grp:last-child{border-right:none;}
@@ -47,6 +47,8 @@ button.tbtn{
   padding:7px 11px;border-radius:7px;font:inherit;font-size:12.5px;cursor:pointer;
   display:flex;align-items:center;gap:6px;white-space:nowrap;transition:.12s;
 }
+/* Symbol-Buttons: Beschriftung steckt in title (Tooltip) und aria-label */
+button.tbtn.icon{padding:5px 0;width:32px;justify-content:center;font-size:17px;line-height:20px;}
 button.tbtn:hover{background:#1a2430;border-color:#2a3646;}
 button.tbtn.active{background:#213146;border-color:var(--accent-service);}
 button.tbtn:disabled{opacity:.4;cursor:default;background:#121923;border-color:var(--panel-border);}
@@ -241,7 +243,7 @@ button.tbtn:disabled{opacity:.4;cursor:default;background:#121923;border-color:v
 #errorBox h4{margin:0 0 10px;font-size:14px;color:var(--danger);}
 #errorList{margin:0 0 16px;padding-left:18px;font-size:12.5px;line-height:1.5;color:var(--text);max-height:260px;overflow:auto;}
 #hint-toast{
-  position:absolute;top:14px;left:50%;transform:translateX(-50%);
+  position:absolute;bottom:14px;left:50%;transform:translateX(-50%); /* unten mittig — kollidiert nie mit der (ggf. umbrechenden) Toolbar */
   background:#132033;border:1px solid #23405c;color:#bcdcff;padding:8px 16px;
   border-radius:8px;font-size:12.5px;z-index:20;display:none;box-shadow:0 6px 20px rgba(0,0,0,.5);
 }

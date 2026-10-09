@@ -57,7 +57,7 @@ Besonderheiten:
 
 - Gibt es nur eine eingehende REST- oder DB-Verbindung, läuft die Animation als Antwort entgegen der Pfeilrichtung.
 - Datenbank-Events haben kein wählbares Ziel – sie antworten immer an das Element, dessen Event sie ausgelöst hat, und können daher nicht manuell gestartet werden.
-- Ketten laufen so lange weiter, bis nichts mehr getriggert wird. Zyklische Trigger (A → B → A) laufen endlos und müssen über **⏹ Simulation stoppen** beendet werden.
+- Ketten laufen so lange weiter, bis nichts mehr getriggert wird. Zyklische Trigger (A → B → A) laufen endlos und müssen über **⏹** (Simulation stoppen) in der Toolbar beendet werden.
 
 ### Zyklus-Erkennung
 
@@ -78,9 +78,11 @@ In der Seitenleiste stehen offene Ziele mit ⚠ im Ziel-Dropdown und lassen sich
 
 ### Rückgängig & Wiederholen
 
-Jede Änderung am Diagramm lässt sich mit **↶ Rückgängig** (Strg+Z) zurücknehmen und mit **↷ Wiederholen** (Strg+Y oder Strg+Umschalt+Z) wiederherstellen – bis zu 200 Schritte. Eine Texteingabe zählt als ein Schritt (abgeschlossen beim Verlassen des Felds), ebenso ein Ziehvorgang. Solange ein Textfeld aktiv ist, wirkt Strg+Z wie gewohnt nur auf den Text im Feld. Auswahl, Zoom und Ansicht gehören nicht zum Verlauf.
+Jede Änderung am Diagramm lässt sich mit **↺** (Rückgängig, Strg+Z) zurücknehmen und mit **↻** (Wiederholen, Strg+Y oder Strg+Umschalt+Z) wiederherstellen – bis zu 200 Schritte. Eine Texteingabe zählt als ein Schritt (abgeschlossen beim Verlassen des Felds), ebenso ein Ziehvorgang. Solange ein Textfeld aktiv ist, wirkt Strg+Z wie gewohnt nur auf den Text im Feld. Auswahl, Zoom und Ansicht gehören nicht zum Verlauf.
 
 ### Ansicht & Bedienung
+
+Die Symbol-Buttons der Toolbar zeigen ihre Bedeutung als Tooltip beim Überfahren mit der Maus.
 
 - **Zoom:** Mausrad (15 % – 300 %)
 - **Verschieben:** Ziehen auf freier Fläche
@@ -92,8 +94,8 @@ Jede Änderung am Diagramm lässt sich mit **↶ Rückgängig** (Strg+Z) zurück
 
 Das Diagramm wird **nicht automatisch gespeichert** – nach einem Neuladen der Seite ist es verloren.
 
-- **⭳ Export JSON** lädt das Diagramm als `microservice-architektur.json` herunter.
-- **⭱ Import JSON** lädt eine zuvor exportierte Datei. Die Datei wird vorher vollständig geprüft (gültiges JSON, bekannte Typen, eindeutige IDs, Positionen, existierende Start- und Zielelemente von Verbindungen, Verbindungsregeln). Bei Fehlern erscheint ein Dialog mit allen gefundenen Problemen, und das aktuelle Diagramm bleibt unverändert.
+- **⭳ Export** lädt das Diagramm als `microservice-architektur.json` herunter.
+- **⭱ Import** lädt eine zuvor exportierte Datei. Die Datei wird vorher vollständig geprüft (gültiges JSON, bekannte Typen, eindeutige IDs, Positionen, existierende Start- und Zielelemente von Verbindungen, Verbindungsregeln). Bei Fehlern erscheint ein Dialog mit allen gefundenen Problemen, und das aktuelle Diagramm bleibt unverändert.
 
 Event-Ziele dürfen beim Import auf nicht vorhandene Elemente verweisen – sie werden als offene Enden übernommen. Die Namen gelöschter Elemente stehen im optionalen Feld `deletedNodes` (ID → Name).
 
