@@ -32,6 +32,8 @@ Verbindungen entstehen durch Ziehen an den kleinen Anfassern eines Elements (**R
 | **Event** | durchgezogener Pfeil | Nicht zu Datenbanken, nicht von/zu Frontends. |
 | **Datenbank** | gestrichelt | Entsteht automatisch, wenn eine REST-Verbindung auf eine Datenbank gezogen wird. |
 
+Zwischen zwei Elementen gibt es pro Richtung höchstens eine Verbindung desselben Typs (eine WebSocket-Verbindung zählt als REST-Verbindung). Die Gegenrichtung ist erlaubt.
+
 Jede Verbindung kann eine Beschreibung erhalten (z. B. `GET /orders`).
 
 Wird eine Verbindung gelöscht, über die Events ihr Ziel erreichen, erscheint vorher eine Rückfrage mit der Liste dieser Events. Bei **OK** wird die Verbindung gelöscht; Events, die danach noch ein anderes erreichbares Ziel haben, verlieren nur das betroffene Ziel, alle anderen werden gelöscht. Bei **Abbrechen** bleibt alles unverändert. Events, die ihr Ziel noch auf einem anderen Weg erreichen (z. B. als Antwort über eine REST-Verbindung), sind nicht betroffen.

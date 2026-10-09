@@ -383,6 +383,8 @@ const TYPE_META = {
   database: {stroke:"var(--accent-db)",       fill:"var(--accent-db-fill)",       label:"DATENBANK"}
 };
 
+const CONN_NAMES = {rest:"REST", event:"Event", db:"Datenbank"};
+
 const CONN_META = {
   rest:  {color:"var(--accent-rest)",  marker:"url(#arrow-rest)",  dash:"none",   label:"REST"},
   event: {color:"var(--accent-event)", marker:"url(#arrow-event)", dash:"none",   label:"EVENT"},
@@ -920,6 +922,10 @@ function createConnection(source, target, connType){
   const error = connectionRuleError(source, target, type);
   if (error){
     toast(error, 4000);
+    return;
+  }
+  if (state.connections.some(c=>c.type===type && c.from===source.id && c.to===target.id)){
+    toast("Zwischen „" + source.name + "“ und „" + target.name + "“ gibt es bereits eine " + CONN_NAMES[type] + "-Verbindung in diese Richtung.", 4000);
     return;
   }
   const conn = {id:uid("c"), type, from:source.id, to:target.id, description:"", websocket:false};
@@ -1842,6 +1848,7 @@ function validateImport(data){
   });
 
   const connIds = new Set();
+  const connKeys = new Set();
   const connTypes = Object.keys(CONN_META);
   data.connections.forEach((c, i)=>{
     const where = "Verbindung " + (i+1) + (isObj(c) && isNonEmptyStr(c.id) ? " („" + c.id + "“)" : "");
@@ -1862,6 +1869,9 @@ function validateImport(data){
         const ruleError = connectionRuleError(from, to, c.type);
         if (ruleError) errors.push(where + ": " + ruleError);
       }
+      const connKey = c.type + "|" + c.from + "|" + c.to;
+      if (connKeys.has(connKey)) errors.push(where + ": doppelte " + CONN_NAMES[c.type] + "-Verbindung von „" + c.from + "“ nach „" + c.to + "“.");
+      connKeys.add(connKey);
     }
     optType(c, "description", "string", where);
     optType(c, "websocket", "boolean", where);

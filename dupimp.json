@@ -1,0 +1,1 @@
+{"nodes":[{"id":"a","type":"service","name":"A","x":0,"y":0,"offersRest":true},{"id":"b","type":"service","name":"B","x":300,"y":0,"offersRest":true}],"connections":[{"id":"c1","type":"rest","from":"a","to":"b"},{"id":"c2","type":"rest","from":"a","to":"b","websocket":true},{"id":"c3","type":"rest","from":"b","to":"a"},{"id":"c4","type":"event","from":"a","to":"b"}]}
