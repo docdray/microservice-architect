@@ -2210,6 +2210,11 @@ function isTextField(el){
 }
 
 ["click", "change", "mouseup"].forEach(type=>window.addEventListener(type, scheduleHistoryCommit, true));
+// Laufende Texteingaben werden erst beim Verlassen des Felds erfasst — der Rückgängig-Button
+// muss aber schon währenddessen bedienbar sein (undo() sichert die Eingabe vorher).
+window.addEventListener("input", e=>{
+  if (isTextField(e.target)) document.getElementById("btn-undo").disabled = false;
+}, true);
 window.addEventListener("keydown", e=>{
   // In Textfeldern gilt das Rückgängig des Browsers; Tippen wird erst bei "change" erfasst.
   if (isTextField(document.activeElement)) return;
