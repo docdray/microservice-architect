@@ -1012,23 +1012,8 @@ function showNodeSidebar(node){
   }
 
   const del = document.createElement("button"); del.className="del-btn"; del.textContent = "Element löschen";
-  del.addEventListener("click", ()=>{
-    state.nodes = state.nodes.filter(n=>n.id!==node.id);
-    state.connections = state.connections.filter(c=>c.from!==node.id && c.to!==node.id);
-    cleanupEventTargets(node.id);
-    deselectAll();
-  });
+  del.addEventListener("click", ()=>deleteNode(node));
   content.appendChild(del);
-}
-
-function cleanupEventTargets(removedNodeId){
-  state.nodes.forEach(n=>{
-    if (Array.isArray(n.events)){
-      n.events.forEach(ev=>{
-        if (Array.isArray(ev.targetIds)) ev.targetIds = ev.targetIds.filter(id=>id!==removedNodeId);
-      });
-    }
-  });
 }
 
 function showConnSidebar(conn){
@@ -1076,42 +1061,44 @@ function showConnSidebar(conn){
   content.appendChild(del);
 }
 
-/* Events, die ein Ziel nur über diese Verbindung erreichen — gibt es nach dem Löschen
-   noch einen anderen Weg (z. B. Antwortweg einer REST-Anfrage), bleibt das Ziel erhalten.
-   Hat ein betroffenes Event danach noch ein anderes erreichbares Ziel, verliert es nur das
-   unerreichbare Ziel ("modified"); sonst wird es gelöscht ("deleted").
-   Datenbank-Events haben kein festes Ziel und sind daher nie betroffen. */
-function eventsUsingConnection(conn){
-  const remaining = state.connections.filter(c=>c.id!==conn.id);
+/* Events, die durch das Entfernen von Verbindungen (und ggf. eines Elements) ein Ziel
+   verlieren. Ein Ziel geht verloren, wenn es das entfernte Element ist oder nur über eine
+   der entfernten Verbindungen erreichbar war — gibt es noch einen anderen Weg (z. B. den
+   Antwortweg einer REST-Anfrage), bleibt es erhalten. Hat ein betroffenes Event danach noch
+   ein anderes erreichbares Ziel, verliert es nur die unerreichbaren Ziele ("modified");
+   sonst wird es gelöscht ("deleted"). Datenbank-Events haben kein festes Ziel und sind
+   daher nie betroffen. */
+function eventsLosingTargets(remainingConnections, removedNodeId){
   const deleted = [], modified = [];
   state.nodes.forEach(node=>{
-    if (node.type === "database") return;
+    if (node.type === "database" || node.id === removedNodeId) return;
     (node.events||[]).forEach(ev=>{
-      const lostIds = (ev.targetIds||[]).filter(targetId=>{
-        const hop = findConnectionForTravel(node.id, targetId);
-        return hop && hop.conn.id === conn.id && !findConnectionForTravel(node.id, targetId, remaining);
-      });
+      const targetIds = ev.targetIds || [];
+      const lostIds = targetIds.filter(targetId=>
+        targetId === removedNodeId ||
+        (findConnectionForTravel(node.id, targetId) && !findConnectionForTravel(node.id, targetId, remainingConnections)));
       if (!lostIds.length) return;
-      const keepsTarget = ev.targetIds.some(targetId=>
-        !lostIds.includes(targetId) && getNode(targetId) && findConnectionForTravel(node.id, targetId, remaining));
+      const keepsTarget = targetIds.some(targetId=>
+        !lostIds.includes(targetId) && getNode(targetId) && findConnectionForTravel(node.id, targetId, remainingConnections));
       (keepsTarget ? modified : deleted).push({node, ev, lostIds});
     });
   });
   return {deleted, modified};
 }
 
-function deleteConnection(conn){
-  const {deleted, modified} = eventsUsingConnection(conn);
-  function doDelete(){
-    state.connections = state.connections.filter(c=>c.id!==conn.id);
-    deleted.forEach(({node, ev})=>{
-      node.events = node.events.filter(e=>e.id!==ev.id);
-    });
-    modified.forEach(({ev, lostIds})=>{
-      ev.targetIds = ev.targetIds.filter(id=>!lostIds.includes(id));
-    });
-    deselectAll();
-  }
+function applyEventLosses({deleted, modified}){
+  deleted.forEach(({node, ev})=>{
+    node.events = node.events.filter(e=>e.id!==ev.id);
+  });
+  modified.forEach(({ev, lostIds})=>{
+    ev.targetIds = ev.targetIds.filter(id=>!lostIds.includes(id));
+  });
+}
+
+/* Führt doDelete direkt aus, wenn keine Events betroffen sind — sonst erst nach Rückfrage.
+   subject: z. B. "Diese Verbindung" / "Dieses Element", what: "der Verbindung" / "des Elements" */
+function confirmEventLosses(losses, subject, what, doDelete){
+  const {deleted, modified} = losses;
   if (!deleted.length && !modified.length){ doDelete(); return; }
 
   const evLabel = ({node, ev}) => node.name + ": " + (ev.name || "(Event)");
@@ -1129,9 +1116,30 @@ function deleteConnection(conn){
     });
   }
   const message = deleted.length
-    ? "Diese Verbindung wird von Events verwendet. Beim Löschen der Verbindung werden diese Events gelöscht:"
-    : "Diese Verbindung wird von Events verwendet. Folgende Events bleiben erhalten, verlieren beim Löschen der Verbindung aber ein Ziel:";
+    ? subject + " wird von Events verwendet. Beim Löschen " + what + " werden diese Events gelöscht:"
+    : subject + " wird von Events verwendet. Folgende Events bleiben erhalten, verlieren beim Löschen " + what + " aber ein Ziel:";
   showConfirm(message, doDelete, {yesLabel:"OK", sections});
+}
+
+function deleteConnection(conn){
+  const remaining = state.connections.filter(c=>c.id!==conn.id);
+  const losses = eventsLosingTargets(remaining);
+  confirmEventLosses(losses, "Diese Verbindung", "der Verbindung", ()=>{
+    state.connections = remaining;
+    applyEventLosses(losses);
+    deselectAll();
+  });
+}
+
+function deleteNode(node){
+  const remaining = state.connections.filter(c=>c.from!==node.id && c.to!==node.id);
+  const losses = eventsLosingTargets(remaining, node.id);
+  confirmEventLosses(losses, "Dieses Element", "des Elements", ()=>{
+    state.nodes = state.nodes.filter(n=>n.id!==node.id);
+    state.connections = remaining;
+    applyEventLosses(losses);
+    deselectAll();
+  });
 }
 
 /* ============================================================
@@ -1916,10 +1924,8 @@ window.addEventListener("keydown", e=>{
   if (confirmOverlay.classList.contains("show")) return;
   if ((e.key === "Delete" || e.key === "Backspace") && document.activeElement.tagName !== "INPUT" && document.activeElement.tagName !== "TEXTAREA"){
     if (selectedNodeId){
-      state.nodes = state.nodes.filter(n=>n.id!==selectedNodeId);
-      state.connections = state.connections.filter(c=>c.from!==selectedNodeId && c.to!==selectedNodeId);
-      cleanupEventTargets(selectedNodeId);
-      deselectAll();
+      const node = getNode(selectedNodeId);
+      if (node) deleteNode(node);
     } else if (selectedConnId){
       const conn = state.connections.find(c=>c.id===selectedConnId);
       if (conn) deleteConnection(conn);

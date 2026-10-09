@@ -20,6 +20,8 @@ Das gesamte Tool steckt in einer einzigen Datei – `microservice-architect.html
 
 Elemente werden über die Toolbar (`+ Service`, `+ Frontend`, `+ Datenbank`) angelegt und per Drag & Drop verschoben. Ein Klick öffnet die Seitenleiste zum Bearbeiten von Name und Beschreibung; die Beschreibung erscheint als Tooltip beim Überfahren mit der Maus.
 
+Ist ein Element Ziel von Events anderer Elemente, erscheint beim Löschen eine Rückfrage mit der Liste dieser Events. Bei **OK** werden Element und Verbindungen gelöscht; Events, die danach noch ein anderes erreichbares Ziel haben, verlieren nur dieses Ziel, alle anderen werden gelöscht.
+
 ### Verbindungen
 
 Verbindungen entstehen durch Ziehen an den kleinen Anfassern eines Elements (**R** = REST, **E** = Event) auf ein anderes Element.
